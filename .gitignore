@@ -1,0 +1,9 @@
+.DS_Store
+target
+.lsp/.cache
+.clj-kondo/.cache
+*.dylib
+zig-cache
+.cpcache
+*~undo-tree~
+.nrepl-port

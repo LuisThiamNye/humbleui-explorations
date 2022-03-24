@@ -1,0 +1,2 @@
+;;
+{:tasks {repl (clojure "-M:lib/hotload:inspect/rebl:inspect/reveal:inspect/portal-cli:repl/cider:dev")}}
