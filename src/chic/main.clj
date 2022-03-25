@@ -2,11 +2,14 @@
   (:require
    [chic.debug :as debug]
    [chic.focus :as focus]
+   [nrepl.server :as nrepl-server]
    [chic.text-editor :as text-editor]
+   [chic.text-editor.core :as text-editor.core]
    [io.github.humbleui.core :as hui]
    [io.github.humbleui.paint :as paint]
    [io.github.humbleui.profile :as profile]
    [nrepl.cmdline :as nrepl]
+   [cider.nrepl :refer [cider-nrepl-handler]]
    [io.github.humbleui.window :as window]
    [io.github.humbleui.ui :as ui])
   (:import
@@ -25,9 +28,8 @@
 (def ^Typeface face-code-default
   (Typeface/makeFromFile "/Volumes/Carbonator/csync/fonts/Input-Font/Input_Fonts/InputSans/InputSansCondensed/InputSansCondensed-Regular.ttf"))
 
-(def editor (text-editor/make
+(def editor (text-editor.core/make
              {:pos 0
-              :content "Hello World!"
               :face-default face-default}))
 (comment
   (:focus-node editor)
@@ -173,7 +175,10 @@
       (window/set-visible true))))
 
 (defn -main [& args]
-  (future (apply nrepl/-main args))
+  ;; (future (apply nrepl/-main args))
+  (spit ".nrepl-port"
+        (:port (nrepl-server/start-server
+                :port 7888 :handler cider-nrepl-handler)))
   (hui/start #(reset! *window (make-window))))
 
 (comment
@@ -181,6 +186,13 @@
     (hui/doui (some-> @*window window/close))
     (reset! *window (hui/doui (make-window))))
 
+  (remount-app)
+  @(:state editor)
+  (-> @(:state editor)
+      :lines-by-id vals vec (get 2) :ui-segments
+      (->> (map (comp :x :size :ui))))
+  ;; 16 8 116
+  ;;  8 8 124
   (System/gc)
   ;; a single scope/chain for shortcuts/key events where there can only be one handler at most.
   ;; widgets register/deregister their shortcuts as they come into/out of focus

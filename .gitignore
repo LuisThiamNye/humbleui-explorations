@@ -2,6 +2,7 @@
 target
 .lsp/.cache
 .clj-kondo/.cache
+*.log
 *.dylib
 zig-cache
 .cpcache

@@ -17,7 +17,8 @@
         org.clojure/core.match {:mvn/version "1.0.0"}
         com.crypticbutter/snoop {:mvn/version "21-353-alpha"}
         tech.droit/fset {:mvn/version "0.1.1"}
-        town.lilac/cascade {:mvn/version "1.2.0"}}
+        town.lilac/cascade {:mvn/version "1.2.0"}
+        rewrite-clj/rewrite-clj {:mvn/version "1.0.699-alpha"}}
 
  :aliases {
            :dev
