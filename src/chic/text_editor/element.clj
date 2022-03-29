@@ -19,7 +19,8 @@
    (chic.text_editor TextEditor)
    [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
     EventKey Window Key KeyModifier]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode TextLine]
+   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode TextLine FontMetrics]
+   [io.github.humbleui.skija.shaper Shaper ShapingOptions]
    [io.github.humbleui.types IPoint IRect Point Rect RRect]))
 
 (defn editor-on-key-down [self focus-manager evt]
@@ -56,6 +57,30 @@
 
   #!
   )
+;; TODO a text span that can display a cursor within it without causing text wobbling (see EOF)
+#_#_#_
+(deftype+ TextSpan [^String text ^Font font ^Paint paint ^TextLine line ^FontMetrics metrics]
+  IComponent
+  (-measure [_ ctx cs]
+            (IPoint.
+             (Math/ceil (.getWidth line))
+             (Math/ceil (.getCapHeight metrics))))
+
+  (-draw [_ ctx cs ^Canvas canvas]
+         (.drawTextLine canvas line 0 (Math/ceil (.getCapHeight metrics)) paint))
+
+  (-event [_ event])
+
+  AutoCloseable
+  (close [_]
+         #_(.close line))) ; TODO
+
+(def ^:private ^Shaper shaper (Shaper/makeShapeDontWrapOrReorder))
+
+(defn text-span [^String text ^Font font ^Paint paint & features]
+  (let [opts (reduce #(.withFeatures ^ShapingOptions %1 ^String %2) ShapingOptions/DEFAULT features)
+        line (.shapeLine shaper text font ^ShapingOptions opts)]
+    (->TextSpan text font paint line (.getMetrics ^Font font))))
 
 (deftype+ NonTextLineSegment [child ^:mut size ^:mut child-rect]
   IComponent
@@ -177,11 +202,11 @@
                                                          (min 1 (/ x (.getWidth ^TextLine (:line label))))))]
                           {:local-idx guessed-idx
                            :right-side? false}))
-    :ui
-    (text-line-segment
-     (ui/padding
-      0 vpadding
-      label))}))
+     :ui
+     (text-line-segment
+      (ui/padding
+       0 vpadding
+       label))}))
 
 (defn full-text-line [self {:keys [font-code fill-text vpadding] :as ctx} line-id]
   (let [sm @(:state self)
@@ -191,19 +216,18 @@
         cursor-id 0
         segments (if (= line-id (:line-id cursor))
                    (let [cursor-idx (:idx cursor)]
-                     [(text-run-segment ctx (subs content 0 cursor-idx) 0)
+                     [(text-run-segment ctx (cond-> content (< cursor-idx (count content))
+                                              (subs 0 cursor-idx)) 0)
                       (cursor-segment sm ctx (str (nth content cursor-idx \space)) cursor-idx cursor-id)
-                      (text-run-segment ctx (subs content (min (inc cursor-idx) (count content))) (unchecked-dec-int (count content)))])
+                      (text-run-segment ctx (subs content (min (inc cursor-idx) (count content)))
+                                        (unchecked-dec-int (count content)))])
                    [(text-run-segment ctx content 0)])]
     (swap! (:state self) assoc-in [:lines-by-id line-id :ui-segments]
            segments)
-    (ui/row
-     (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x9F4070a0)))
-              (->FullTextLine
-               (-> (mapv (fn [s] [:hug nil (:ui s)]) segments)
-                   #_(conj [:stretch 1 (ui/gap 0 0)]))
-               nil))
-     [:stretch 1 (ui/gap 0 0)])))
+    (->FullTextLine
+     (-> (mapv (fn [s] [:hug nil (:ui s)]) segments)
+         #_(conj [:stretch 1 (ui/gap 0 0)]))
+     nil)))
 
 (extend-type TextEditor
   PTextEditor_Element
@@ -220,7 +244,7 @@
             {:keys [line-order]} state'
             leading (-> font-code .getMetrics .getCapHeight Math/ceil (/ scale))
             fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))
-            vpadding (/ leading 2)
+            vpadding (/ leading 5)
             ctx {:fill-text fill-text :font-code font-code :vpadding vpadding}]
         (ui/on-key-down
          #(editor-on-key-down self focus-manager %)
@@ -234,3 +258,4 @@
 ;; But the width of the first character may be fractional.
 ;; So when moving the cursor forwards, the starting offset of the second character is different
 ;; - it moves right to give full pixel space to the first character
+;; not enough to modify Label to remove ceil because IPoint uses ints

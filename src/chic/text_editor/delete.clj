@@ -55,38 +55,41 @@
                    (reduce (fn [sm {:keys [idx line-id i]}]
                              (if (zero? idx)
                                (let [line-order (:line-order sm)
-                                     line-before-id (nth line-order (unchecked-dec-int(line/line-order-idx sm line-id)) nil)]
+                                     line-before-id (nth line-order (unchecked-dec-int (line/line-order-idx sm line-id)) nil)]
                                  (if line-before-id
                                    (let [line-before (get-in sm [:lines-by-id line-before-id])
                                          content-before (:content line-before)]
                                      (-> sm
-                                        (delete-line line-before-id)
-                                        (update-in [:lines-by-id line-id :content]
-                                                   (fn [c] (str content-before c)))
-                                        (assoc-in [:cursors i :idx] (count content-before))))
+                                         (delete-line line-before-id)
+                                         (update-in [:lines-by-id line-id :content]
+                                                    (fn [c] (str content-before c)))
+                                         (assoc-in [:cursors i :idx] (count content-before))))
                                    sm))
                                (-> sm
-                                  (line-delete-between* line-id (unchecked-subtract-int idx n) idx)
-                                  (assoc-in [:cursors i :idx] (unchecked-subtract-int idx n)))))
+                                   (line-delete-between* line-id (unchecked-subtract-int idx n) idx)
+                                   (assoc-in [:cursors i :idx] (unchecked-subtract-int idx n)))))
                            sm
                            (cursor/cursors-indexed sm)))))
   (delete-forwards [{:keys [state]} n]
-    (swap! state (fn [{:keys [] :as sm}]
-                   (reduce (fn [sm {:keys [idx line-id i]}]
-                             (let [line (get-in sm [:lines-by-id line-id])]
-                               (if (== idx (line/end-idx line))
-                                (let [line-order (:line-order sm)
-                                      line-after-id (nth line-order (inc (line/line-order-idx sm line-id)) nil)]
-                                  (if line-after-id
-                                    (let [line-after (get-in sm [:lines-by-id line-after-id])
-                                          content-after (:content line-after)]
-                                      (-> sm
-                                          (delete-line line-after-id)
-                                          (update-in [:lines-by-id line-id :content]
-                                                     (fn [c] (str c content-after)))))
-                                    sm))
-                                (-> sm
-                                    (line-delete-between* line-id idx (+ idx n)))))
-                             (line-delete-between* sm line-id idx (+ n idx)))
-                           sm
-                           (cursor/cursors-indexed sm))))))
+    (swap! state
+           (fn [sm]
+             (reduce (fn [sm {:keys [idx line-id i]}]
+                       (let [line (get-in sm [:lines-by-id line-id])
+                             line-end-idx (line/end-idx line)]
+                         (if (== (unchecked-dec-int idx) line-end-idx)
+                           (let [line-order (:line-order sm)
+                                 line-after-id (nth line-order (inc (line/line-order-idx sm line-id)) nil)]
+                             (if line-after-id
+                               (let [line-after (get-in sm [:lines-by-id line-after-id])
+                                     content-after (:content line-after)]
+                                 (-> sm
+                                     (delete-line line-after-id)
+                                     (update-in [:lines-by-id line-id :content]
+                                                (fn [c] (str c content-after)))))
+                               sm))
+                           (-> sm
+                               (line-delete-between* line-id idx (+ idx n))
+                               (cond-> (and (not (:insert-mode? sm)) (< line-end-idx (+ idx n)))
+                                 (assoc-in [:cursors i :idx] (max 0 (dec line-end-idx))))))))
+                     sm
+                     (cursor/cursors-indexed sm))))))

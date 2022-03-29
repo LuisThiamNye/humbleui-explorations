@@ -1,6 +1,13 @@
 (ns chic.main
   (:require
    [chic.debug :as debug]
+   [chic.ui :as cui]
+   [chic.ui.layout :as cuilay]
+   [clojure.string :as str]
+   [chic.filebwr :as filebwr]
+   [chic.error :as error]
+   [chic.cljbwr :as cljbwr]
+   [chic.windows :as windows]
    [chic.focus :as focus]
    [nrepl.server :as nrepl-server]
    [chic.text-editor :as text-editor]
@@ -10,32 +17,14 @@
    [io.github.humbleui.profile :as profile]
    [nrepl.cmdline :as nrepl]
    [cider.nrepl :refer [cider-nrepl-handler]]
-   [io.github.humbleui.window :as window]
+   [chic.style :as style]
+   [io.github.humbleui.window :as huiwin]
    [io.github.humbleui.ui :as ui])
   (:import
    [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
     EventKey Window EventWindowFocusOut]
    [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
    [io.github.humbleui.types IPoint]))
-
-(defonce *window (atom nil))
-
-(def ^Typeface face-default
-  (.matchFamiliesStyle (FontMgr/getDefault)
-                       (into-array String ["Roboto Slab", ".SF NS", "Helvetica Neue", "Arial"])
-                       FontStyle/NORMAL))
-
-(def ^Typeface face-code-default
-  (Typeface/makeFromFile "/Volumes/Carbonator/csync/fonts/Input-Font/Input_Fonts/InputSans/InputSansCondensed/InputSansCondensed-Regular.ttf"))
-
-(def editor (text-editor.core/make
-             {:pos 0
-              :face-default face-default}))
-(comment
-  (:focus-node editor)
-  (:state editor)
-  ;;
-  )
 
 (def *pressed-keys (volatile! #{}))
 (def focus-manager (focus/new-manager))
@@ -68,95 +57,45 @@
                           (apply str letters))]))]
          (ui/label s font-ui fill-text)))))))
 
-(declare app remount-app)
+(def *app-root (volatile! nil))
 
-(defn remount-app []
-  (alter-var-root
-   #'app
-   (fn [_]
-     (ui/dynamic
-      ctx [scale (:scale ctx)]
-      (let [font-ui (Font. face-default (float (* 13 scale)))
-            leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
-            fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
-        (ui/with-context {:face-ui face-default
-                          :face-code face-code-default
-                          :font-code (Font. face-code-default (float (* 13 scale)))
-                          :font-ui font-ui
-                          :focus-manager focus-manager
-                          :leading leading
-                          :fill-text fill-text}
-          (ui/column
-           (ui/padding
-            20 leading
-            (text-editor/element editor))
-           [:stretch 1
+(defn build-app-root []
+  (ui/dynamic
+    ctx [scale (:scale ctx)
+         window (:chic/current-window ctx)]
+    (let [font-ui (Font. style/face-default (float (* 14 scale)))
+          leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
+          fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
+      (ui/with-context {:face-ui style/face-default
+                        :face-code style/face-code-default
+                        :font-code (Font. style/face-code-default (float (* 14 scale)))
+                        :font-ui font-ui
+                        :focus-manager focus-manager
+                        :leading leading
+                        :fill-text fill-text}
+        (cuilay/column
+         [:stretch 1
+          (cui/dyncomp
+           (filebwr/basic-view))]
+         #_[:stretch 1
             (ui/gap 0 0)]
-           (ui/height
-            20
-            (ui/fill
-             (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
-             (ui/row
-              key-indicator
-              [:stretch 1
-               (ui/gap 0 0)]
-              (ui/clickable
-               #(remount-app)
-               (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
-                        (ui/valign
-                         0.5 (ui/label "Reload" font-ui fill-text)))))))))))))
-  (some-> @*window window/request-frame))
+         (cuilay/height
+          20
+          (ui/fill
+           (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
+           (cuilay/row
+            key-indicator
+            [:stretch 1
+             (ui/gap 0 0)]
+            (ui/clickable
+             #(windows/remount-window window)
+             (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
+                      (ui/valign
+                       0.5 (ui/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
 
-(remount-app)
 
-(defn on-paint [window ^Canvas canvas]
-  (.clear canvas (unchecked-int 0xFFF6F6F6))
-  (let [bounds (window/content-rect window)
-        ctx {:scale (window/scale window)}]
-    (profile/reset)
-    ; (profile/measure "frame"
-    (ui/draw app ctx bounds canvas)
-    (profile/log)
-    #_(window/request-frame window)))
 
-(defn on-event [window event]
-  (try
-    (let [changed? (condp instance? event
-                     EventMouseMove
-                     (let [pos (IPoint. (.getX ^EventMouseMove event) (.getY ^EventMouseMove event))
-                           event {:hui/event :hui/mouse-move
-                                  :hui.event/pos pos}]
-                       (ui/event app event))
-
-                     EventMouseButton
-                     (let [event {:hui/event :hui/mouse-button
-                                  :hui.event.mouse-button/is-pressed (.isPressed ^EventMouseButton event)}]
-                       (ui/event app event))
-
-                     EventMouseScroll
-                     (ui/event app
-                               {:hui/event :hui/mouse-scroll
-                                :hui.event.mouse-scroll/dx (.getDeltaX ^EventMouseScroll event)
-                                :hui.event.mouse-scroll/dy (.getDeltaY ^EventMouseScroll event)})
-
-                     EventWindowFocusOut
-                     (do (vreset! *pressed-keys #{})
-                         (prn "Focus out")
-                         false)
-
-                     EventKey
-                     (ui/event app
-                               {:hui/event (if (.isPressed ^EventKey event) :hui/key-down :hui/key-up)
-                                :hui.event.key/key (.getName (.getKey ^EventKey event))
-                                :eventkey event})
-
-                     nil)]
-      (when changed?
-        (window/request-frame window)))
-    (catch Exception e
-      (debug/println-main (pr-str e)))))
-
-(defn make-window []
+(defn make-main-window []
   (let [screen (last (hui/screens))
         scale (:scale screen)
         width (* 600 scale)
@@ -165,34 +104,41 @@
         x (:x area)
         y (-> (:height area) (- height) (/ 2) (+ (:y area)))]
     (doto
-     (window/make
-      {:on-close #(reset! *window nil)
-       :on-paint #'on-paint
-       :on-event #'on-event})
-      (window/set-title "Chic")
-      (window/set-window-size width height)
-      (window/set-window-position x y)
-      (window/set-visible true))))
+     (windows/make
+      {:id "main"
+       :*app-root *app-root
+       :build-app-root #'build-app-root
+       :on-close #(fn [])})
+      (huiwin/set-title "Chic")
+      (huiwin/set-window-size width height)
+      (huiwin/set-window-position x y)
+      (huiwin/set-visible true))))
 
 (defn -main [& args]
-  ;; (future (apply nrepl/-main args))
-  (spit ".nrepl-port"
-        (:port (nrepl-server/start-server
-                :port 7888 :handler cider-nrepl-handler)))
-  (hui/start #(reset! *window (make-window))))
+  (future (apply nrepl/-main args))
+  (future
+    (Thread/sleep 1000)
+    (spit ".nrepl-port"
+          (:port (nrepl-server/start-server
+                  :port 7888 :handler cider-nrepl-handler))))
+  (hui/start #(make-main-window)))
 
 (comment
+  (require 'chic.main :reload-all)
   (do
-    (hui/doui (some-> @*window window/close))
-    (reset! *window (hui/doui (make-window))))
+    (hui/doui
+     (some-> (some #(when (= "main" (:id %)) %) (vals @windows/*windows))
+             :window-obj huiwin/close)
+     (make-main-window)))
+
+  (chic.windows/request-frame (first (vals @windows/*windows)))
+
+  @(:*ctx (first (vals @windows/*windows)))
+  (:*ui-error (second (vals @windows/*windows)))
+  ( @*app-root)
 
   (remount-app)
-  @(:state editor)
-  (-> @(:state editor)
-      :lines-by-id vals vec (get 2) :ui-segments
-      (->> (map (comp :x :size :ui))))
-  ;; 16 8 116
-  ;;  8 8 124
+
   (System/gc)
   ;; a single scope/chain for shortcuts/key events where there can only be one handler at most.
   ;; widgets register/deregister their shortcuts as they come into/out of focus
@@ -203,6 +149,7 @@
           "xyz")
   (.println (System/out) "x")
   (.println *out* "x")
+
 
 #!
   )

@@ -2,6 +2,7 @@
   (:require
    [chic.text-editor :as text-editor :refer [PTextEditor_Modes]]
    [chic.text-editor.cursor :as cursor]
+   [chic.text-editor.move :as move]
    [chic.text-editor.line :as line]
    [clojure.string :as str]
    [chic.key :as key]
@@ -103,16 +104,16 @@
             (text-editor/insert-str self (.getName k))
             (.isDigitKey k)
             (text-editor/insert-str self (case (first (.getName k))
-                               \1 "!"
-                               \2 "@"
-                               \3 "#"
-                               \4 "$"
-                               \5 "%"
-                               \6 "^"
-                               \7 "&"
-                               \8 "*"
-                               \9 "("
-                               \0 ")"))))
+                                           \1 "!"
+                                           \2 "@"
+                                           \3 "#"
+                                           \4 "$"
+                                           \5 "%"
+                                           \6 "^"
+                                           \7 "&"
+                                           \8 "*"
+                                           \9 "("
+                                           \0 ")"))))
         (when (key/only-modifier? ek (key/mask KeyModifier/CONTROL))
           (cond
             (identical? Key/D k)
@@ -132,16 +133,26 @@
 (defn handle-keydown-default [self evt]
   (let [ek ^EventKey (:eventkey evt)
         k ^Key (.getKey ek)]
-    (when (key/no-modifiers? ek)
-      (cond
-        (identical? Key/RIGHT k)
-        [(text-editor/move-forwards self)]
-        (identical? Key/LEFT k)
-        [(text-editor/move-backwards self)]
-        (identical? Key/DOWN k)
-        [(text-editor/move-down self)]
-        (identical? Key/UP k)
-        [(text-editor/move-up self)]))))
+    (or (when (key/no-modifiers? ek)
+          (cond
+            (identical? Key/RIGHT k)
+            [(text-editor/move-forwards self)]
+            (identical? Key/LEFT k)
+            [(text-editor/move-backwards self)]
+            (identical? Key/DOWN k)
+            [(text-editor/move-down self)]
+            (identical? Key/UP k)
+            [(text-editor/move-up self)]))
+        (when (key/only-modifier? ek (key/mask KeyModifier/CONTROL))
+          (cond
+            (identical? Key/F k)
+            [(text-editor/move-forwards self)]
+            (identical? Key/B k)
+            [(text-editor/move-backwards self)]
+            (identical? Key/N k)
+            [(text-editor/move-down self)]
+            (identical? Key/P k)
+            [(text-editor/move-up self)])))))
 
 (extend-type TextEditor
   PTextEditor_Modes
@@ -153,7 +164,8 @@
                        (assoc :insert-mode? false)
                        (remove-key-handler :down :insert-mode)
                        (add-key-hanlder :down {:id :normal-mode
-                                               :handler #(handle-keydown-normal-mode %1 %2)})))))
+                                               :handler #(handle-keydown-normal-mode %1 %2)})
+                       move/move-backwards))))
   (enable-insert-mode [{:keys [state]}]
     (swap! state (fn [state]
                    (-> state

@@ -3,6 +3,7 @@
    [chic.text-editor :as text-editor :refer [PTextEditor_Element PTextEditor_Move]]
    [chic.text-editor.cursor :as cursor]
    [chic.text-editor.line :as line]
+   [chic.text-editor.element]
    [clojure.string :as str]
    [chic.key :as key]
    [chic.focus :as focus]
@@ -92,6 +93,14 @@
    sm
    (cursor/cursors-indexed sm)))
 
+(defn move-backwards [sm]
+  (reduce (fn [sm {:keys [idx i line-id]}]
+            (if (zero? idx)
+              sm
+              (update-in sm [:cursors i :idx] dec)))
+          sm
+          (cursor/cursors-indexed sm)))
+
 (extend-type TextEditor
   PTextEditor_Move
   (move-up [{:keys [state]}]
@@ -101,16 +110,11 @@
   (move-forwards [{:keys [state] :as self}]
     (swap! state (fn [sm]
                    (reduce (fn [sm {:keys [idx i line-id]}]
-                             (if (== idx (line/end-idx (get-in sm [:lines-by-id line-id])))
+                             (if (== idx (cond-> (line/end-idx (get-in sm [:lines-by-id line-id]))
+                                           (:insert-mode? sm) inc))
                                sm
                                (update-in sm [:cursors i :idx] inc)))
                            sm
                            (cursor/cursors-indexed sm)))))
   (move-backwards [{:keys [state] :as self}]
-    (swap! state (fn [sm]
-                   (reduce (fn [sm {:keys [idx i line-id]}]
-                             (if (zero? idx)
-                               sm
-                               (update-in sm [:cursors i :idx] dec)))
-                           sm
-                           (cursor/cursors-indexed sm))))))
+    (swap! state move-backwards)))
