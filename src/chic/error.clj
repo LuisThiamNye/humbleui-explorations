@@ -27,9 +27,9 @@
         fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
     (ui/dynamic
      ctx [eb (:error-boundary ctx)]
-     (ui/padding
+     (cuilay/padding
       5 5
-      (ui/column
+      (cuilay/column
        (when eb
          (cui/clickable
           (fn [event]
@@ -37,17 +37,17 @@
               (reset-error-boundary eb)))
           (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
                    (ui/halign
-                    0.5 (ui/padding 20 5 (ui/label "Reload" font-ui fill-text))))))
+                    0.5 (ui/padding 20 5 (ui/label "Reload boundary" font-ui fill-text))))))
        (for [l (str/split-lines (pr-str error))]
-         (ui/padding
+         (cuilay/padding
           0 3
           (ui/label l font-ui fill-text)))
        (ui/gap 0 50))))))
 
 (defn error-view-of [error]
   (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xA0FFFFFF)))
-           (ui/vscrollbar
-            (ui/vscroll
+           (cuilay/vscrollbar
+            (cuilay/vscroll
              (full-error-view-of error)))))
 
 (defn build-render-error-window-root [{:keys [throwable bitmap]}]
@@ -61,8 +61,8 @@
        (cuilay/column
         (ui/padding
          2 4 (ui/label (str throwable) font-ui fill-text))
-        (ui/halign
-         0.5 (ui/padding
+        (cuilay/halign
+         0.5 (cuilay/padding
               0 10 (ui/dynamic
                     ctx [offset (:chic.ui/component-pos ctx)]
                     (ui/custom-ui

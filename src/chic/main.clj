@@ -7,6 +7,7 @@
    [chic.filebwr :as filebwr]
    [chic.error :as error]
    [chic.cljbwr :as cljbwr]
+   [chic.depview :as depview]
    [chic.windows :as windows]
    [chic.focus :as focus]
    [nrepl.server :as nrepl-server]
@@ -76,7 +77,7 @@
         (cuilay/column
          [:stretch 1
           (cui/dyncomp
-           (filebwr/basic-view))]
+           (depview/basic-view))]
          #_[:stretch 1
             (ui/gap 0 0)]
          (cuilay/height
@@ -107,7 +108,7 @@
      (windows/make
       {:id "main"
        :*app-root *app-root
-       :build-app-root #'build-app-root
+       :build-app-root #(cui/dyncomp (build-app-root))
        :on-close #(fn [])})
       (huiwin/set-title "Chic")
       (huiwin/set-window-size width height)
@@ -124,7 +125,6 @@
   (hui/start #(make-main-window)))
 
 (comment
-  (require 'chic.main :reload-all)
   (do
     (hui/doui
      (some-> (some #(when (= "main" (:id %)) %) (vals @windows/*windows))

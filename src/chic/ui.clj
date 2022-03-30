@@ -2,8 +2,7 @@
   (:require
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui]
-   [chic.ui :as cui])
+   [io.github.humbleui.ui :as ui])
   (:import
    [java.lang AutoCloseable]
    [io.github.humbleui.types IPoint IRect Point Rect RRect]
@@ -68,6 +67,11 @@
   ([child ctx cs offset]
    (huip/-measure child (child-ctx ctx child cs offset) cs)))
 
+(defn measure-child-unbounded
+  ([child ctx]
+   (let [cs (IPoint. Integer/MAX_VALUE Integer/MAX_VALUE)]
+     (huip/-measure child (child-ctx ctx child cs) cs))))
+
 (defn draw-child
   ([child ctx cs canvas]
    (huip/-draw child (child-ctx ctx child cs) cs canvas))
@@ -120,7 +124,7 @@
          (ui/child-close child)))
 
 (defn clickable [on-event child]
-  (cui/dyncomp
+  (dyncomp
    (->Clickable on-event child nil false false)))
 
 (deftype+ MouseMoveListener [on-event child]
@@ -142,7 +146,7 @@
          (ui/child-close child)))
 
 (defn on-mouse-move [on-event child]
-  (cui/dyncomp
+  (dyncomp
    (->MouseMoveListener on-event child)))
 
 (deftype+ BeforeDrawHook [on-draw child]

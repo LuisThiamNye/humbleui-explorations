@@ -6,7 +6,6 @@
    [clojure.repl :as repl]
    [clojure.string :as str]
    [chic.style :as style]
-   [chic.windows :as windows]
    [chic.focus :as focus]
    [io.github.humbleui.core :as hui]
    [io.github.humbleui.paint :as paint]

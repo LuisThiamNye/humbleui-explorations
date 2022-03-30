@@ -20,7 +20,7 @@
          (let [layer (.save canvas)
                child-size (huip/-measure child ctx cs)
                left (- (* (:width cs) coeff) (* (:width child-size) child-coeff))]
-           (set! child-rect (IRect/makeXYWH left 0 (:width child-size) (:height cs)))
+           (set! child-rect (IRect/makeXYWH left 0 (max 0 (:width child-size)) (:height cs)))
            (try
              (.translate canvas left 0)
              (draw-child child ctx child-rect canvas {:x left :y 0})
@@ -47,7 +47,7 @@
          (let [layer (.save canvas)
                child-size (huip/-measure child ctx cs)
                top (- (* (:height cs) coeff) (* (:height child-size) child-coeff))]
-           (set! child-rect (IRect/makeXYWH 0 top (:width cs) (:height child-size)))
+           (set! child-rect (IRect/makeXYWH 0 top (:width cs) (max 0 (:height child-size))))
            (try
              (.translate canvas 0 top)
              (draw-child child ctx child-rect canvas {:x 0 :y top})
@@ -121,7 +121,7 @@
          (let [known (for [[mode _ child] children]
                        (when (= :hug mode)
                          (huip/-measure child ctx cs)))
-               space (- (:height cs) (transduce (keep :height) + 0 known))
+               space (max 0 (- (:height cs) (transduce (keep :height) + 0 known)))
                stretch (transduce (keep (fn [[mode value _]] (when (= :stretch mode) value))) + 0 children)
                layer (.save canvas)]
            (try
@@ -183,7 +183,7 @@
          (let [known (for [[mode _ child] children]
                        (when (= :hug mode)
                          (measure-child child ctx cs)))
-               space (- (:width cs) (transduce (keep :width) + 0 known))
+               space (max 0 (- (:width cs) (transduce (keep :width) + 0 known)))
                stretch (transduce (keep (fn [[mode value _]] (when (= :stretch mode) value))) + 0 children)
                layer (.save canvas)]
            (loop [width 0
@@ -314,10 +314,39 @@
 (deftype+ SizeDependent [childf ^:mut child]
   IComponent
   (-measure [_ ctx cs]
-            (set! child (childf cs))
+            (let [child' (childf cs)]
+              (when-not (identical? child child')
+                (ui/child-close child)
+                (set! child child')))
             (measure-child child ctx cs))
   (-draw [_ ctx cs ^Canvas canvas]
-         (set! child (childf cs))
+         (let [child' (childf cs)]
+           (when-not (identical? child child')
+             (ui/child-close child)
+             (set! child child')))
+         (draw-child child ctx cs canvas))
+  (-event [_ event] (huip/-event child event))
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn size-dependent [childf]
+  (cui/dyncomp
+   (->SizeDependent childf nil)))
+#_#_
+(deftype+ ChildSizeDependent [inner-child child-ctor ^:mut child]
+  IComponent
+  (-measure [_ ctx cs]
+            (let [child' (child-ctor cs)]
+              (when-not (identical? child child')
+                (ui/child-close child)
+                (set! child child')))
+            (measure-child child ctx cs))
+  (-draw [_ ctx cs ^Canvas canvas]
+         (let [ichild-size (cui/measure-child inner-child ctx cs)
+               child' (child-ctor cs)]
+           (when-not (identical? child child')
+             (ui/child-close child)
+             (set! child child')))
          (draw-child child ctx cs canvas))
   (-event [_ event] (huip/-event child event))
   AutoCloseable
@@ -408,4 +437,4 @@
 
 (defn stack [& children]
   (cui/dyncomp
-   (->Stack (eduction (remove nil?) children))))
+   (->Stack (into [] (remove nil?) (flatten children)))))

@@ -1,5 +1,6 @@
 (ns chic.windows
   (:require
+   [io.github.humbleui.core :as hui]
    [chic.debug :as debug]
    [chic.style :as style]
    [chic.error :as error]
@@ -18,6 +19,26 @@
    [io.github.humbleui.types IPoint]))
 
 (defonce *windows (atom {}))
+
+(declare make)
+
+(defn make-render-error-window [{:keys [throwable] :as opts}]
+  (let [screen (last (hui/screens))
+        scale (:scale screen)
+        area (:work-area screen)
+        width (* 600 scale)
+        height (int (* 0.9 (:height area)))
+        x (-> (:width area) (- width) (/ 2) (+ (:x area)))
+        y (-> (:height area) (- height) (/ 2) (+ (:y area)))]
+    (doto
+      (make
+       {:id (random-uuid)
+        :build-app-root (fn [] (cui/dyncomp (error/build-render-error-window-root opts)))
+        :on-close (fn [])})
+      (huiwin/set-title (str "Render error: " throwable))
+      (huiwin/set-window-size width height)
+      (huiwin/set-window-position x y)
+      (huiwin/set-visible true))))
 
 (defn on-event-handler [{:keys [*app-root window-obj *ctx]} event]
   (try
@@ -85,7 +106,7 @@
                       #(remount-window window)
                       (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
                                (ui/halign
-                                0.5 (ui/padding 20 5 (ui/label "Reload" font-ui fill-text)))))
+                                0.5 (ui/padding 20 5 (ui/label "Reload window" font-ui fill-text)))))
                      (ui/padding 5 5 (ui/label (str error) font-ui fill-text))
                      (cui.error/bound-errors
                       (cuilay/column
@@ -98,10 +119,11 @@
         ctx (assoc @*ctx :scale (huiwin/scale window-obj)
                    :chic/current-window w
                    :chic.ui/component-rect (huiwin/content-rect window-obj)
-                   :chic.ui/component-pos (IPoint. 0 0))]
+                   :chic.ui/component-pos (IPoint. 0 0)
+                   :chic.ui/make-render-error-window make-render-error-window)]
     (profile/reset)
-    ;; (profile/measure "frame")
-    (try (ui/draw (cui.error/bound-errors @*app-root) ctx bounds canvas)
+    (profile/measure "frame")
+    (try (ui/draw @*app-root ctx bounds canvas)
          (catch Throwable e
            (vreset! *ui-error e)
            (vreset! *app-root error-view)
