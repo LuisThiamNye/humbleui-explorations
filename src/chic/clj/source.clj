@@ -1,5 +1,6 @@
 (ns chic.clj.source
   (:require
+   [clojure.repl :as repl]
    [clojure.string :as str]
    [clojure.java.io :as io]
    [clojure-lsp.db :as lsp.db]
@@ -21,6 +22,19 @@
       (reader-skip-lines rdr (unchecked-dec-int (:line mmap)))
       (.skip rdr (unchecked-dec-int (:column mmap)))
       (read (PushbackReader. rdr)))))
+
+(defn crude-source-of-var [v]
+  (when (= \/ (first (:file (meta v))))
+    (alter-meta! v (fn [m]
+                     (update m :file
+                             (fn [f]
+                               (str/replace f #"/Volumes/House/prg/chic/src/" ""))))))
+  (try
+    (push-thread-bindings {Compiler/LOADER (.getClassLoader Compiler)})
+    (repl/source-fn (symbol v))
+    (catch Exception _ nil)
+    (finally
+      (pop-thread-bindings))))
 
 (comment
   (read-var-source-code #'chic.cljbwr/basic-view)

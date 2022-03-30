@@ -122,7 +122,7 @@
                    :chic.ui/component-pos (IPoint. 0 0)
                    :chic.ui/make-render-error-window make-render-error-window)]
     (profile/reset)
-    (profile/measure "frame")
+    ;; (profile/measure "frame")
     (try (ui/draw @*app-root ctx bounds canvas)
          (catch Throwable e
            (vreset! *ui-error e)

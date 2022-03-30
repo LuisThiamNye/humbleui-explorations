@@ -127,6 +127,21 @@
   (dyncomp
    (->Clickable on-event child nil false false)))
 
+(deftype+ EventListener [on-event child]
+  IComponent
+  (-measure [_ ctx cs] (measure-child child ctx cs))
+
+  (-draw [_ ctx cs canvas] (draw-child child ctx cs canvas))
+
+  (-event [_ event] (hui/eager-or
+                     (on-event event)
+                     (huip/-event child event)))
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn on-event [handler child]
+  (->EventListener handler child))
+
 (deftype+ MouseMoveListener [on-event child]
   IComponent
   (-measure [_ ctx cs] (measure-child child ctx cs))

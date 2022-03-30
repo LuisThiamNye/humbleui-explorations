@@ -5,6 +5,7 @@
    [chic.ui.layout :as cuilay]
    [clojure.repl :as repl]
    [clojure.string :as str]
+   [chic.clj.source :as clj.source]
    [chic.style :as style]
    [chic.focus :as focus]
    [io.github.humbleui.core :as hui]
@@ -33,17 +34,15 @@
 (defn classname->sym [clsn]
   (some->  (re-matches #".+/(?:[^/]+|/)" (repl/demunge clsn)) symbol))
 
+(defn source-of-sym [sym]
+  (or (when-let [v (resolve sym)]
+        (clj.source/crude-source-of-var v))
+      "not found"))
+
 (defn source-of-classname [clsname]
   (let [dm (repl/demunge clsname)]
     (if-let [sym (classname->sym clsname)]
-      (try ;@(future(repl/source-fn sym))
-        (try
-          (push-thread-bindings {Compiler/LOADER (.getClassLoader Compiler)})
-          (or (repl/source-fn sym) "not found")
-          (finally
-            (pop-thread-bindings)))
-           (catch Exception e
-             (str e)))
+      (source-of-sym sym)
       "-")))
 
 (comment
@@ -137,12 +136,21 @@
                        (nnext frames)))
                ;; (= "invoke" (.getMethodName frame))
                :else
-               (recur (conj children
-                            (ui/row
-                             (file-label (.getFileName frame))
-                             (line-number-seg (.getLineNumber frame))
-                             (namespaced-seg clsname)))
-                      (next frames))
+               (let [sym-str (second (re-matches #"([^/]+/(?:[^/]+|/))(?:/.+)?" (repl/demunge clsname)))
+                     sym (some-> sym-str symbol)
+                     varmeta (some-> sym resolve meta)
+                     highlighted-line (when varmeta
+                                        (- (.getLineNumber frame) (:line varmeta)))
+                     ui (ui/row
+                         (file-label (.getFileName frame))
+                         (line-number-seg (.getLineNumber frame))
+                         (namespaced-seg clsname))]
+                 (recur (conj children
+                              (if sym
+                                (expandable-item
+                                 ui (source-view (source-of-sym sym) highlighted-line))
+                                ui))
+                       (next frames)))
                )
              (some #(= % "clojure.lang.IType") (map #(.getName %) (ancestors (Class/forName clsname))))
              (recur (conj children
