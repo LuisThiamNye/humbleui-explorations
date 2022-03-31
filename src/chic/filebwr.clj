@@ -106,8 +106,8 @@
                          (cuilay/valign
                           0.5 (cuilay/height
                                12 (ui.svg/make (if dir?
-                                                 (maticons/find-svg-file "folder" "outlined" "24px")
-                                                 (maticons/find-svg-file "description" "outlined" "24px")))))))
+                                                 (maticons/svg-data "folder" "outlined" "24px")
+                                                 (maticons/svg-data "description" "outlined" "24px")))))))
                        (cuilay/padding
                         2 5
                         (ui/label string font-ui (cond-> fill-text
@@ -167,15 +167,15 @@
   (cuilay/column
    (cuilay/row
     (ui/clickable
-     (fn [] (fs/list-dir @*directory))
+     (fn [] (reset! *directory-items (fs/list-dir @*directory)))
      (cuilay/padding
       4 4 (ui/height
-           18 (ui/width 18 (ui.svg/make (maticons/find-svg-file "refresh" "round" "24px"))))))
+           18 (ui/width 18 (ui.svg/make (maticons/svg-data "refresh" "round" "24px"))))))
     (ui/clickable
      (fn [])
      (cuilay/padding
       4 4 (cuilay/height
-           18 (cuilay/width 18 (ui.svg/make (maticons/find-svg-file "add" "round" "24px"))))))
+           18 (cuilay/width 18 (ui.svg/make (maticons/svg-data "add" "round" "24px"))))))
     [:stretch 1
      (ui/gap 0 0)])
    (text-input/make)))

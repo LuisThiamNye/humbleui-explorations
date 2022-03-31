@@ -71,8 +71,7 @@
                                 (ui/gap 8 0))))))
         ns-foreign-fill (doto (.makeClone fill-text)
                           (.setAlpha 128))
-        ns-fill (doto (.makeClone fill-text)
-                  (.setAlpha 180))
+        ns-fill (doto (Paint.) (.setColor (unchecked-int 0xC0003040)))
         ns-label (fn [clsname]
                    (ui/label clsname font-ui (if (str/starts-with? clsname "chic")
                                                ns-fill ns-foreign-fill)))

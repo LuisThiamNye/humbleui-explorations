@@ -1,9 +1,9 @@
 (ns chic.graph
   (:require
    [chic.ui :as cui]
-   [chic.ui.svg :as ui.svg]
    [chic.ui.icons.material :as maticons]
    [chic.ui.layout :as cuilay]
+   [chic.ui.svg :as ui.svg]
    [chic.windows :as windows]
    [clojure.math :as math]
    [io.github.humbleui.core :as hui]
@@ -331,7 +331,7 @@
     4
     (if checked?
       (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFF0090FF)))
-               (ui.svg/make (maticons/find-svg-file "check" "round" "24px")))
+               (ui.svg/make (maticons/svg-data "check" "round" "24px")))
       (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))
                (ui/padding
                 2 (ui/clip-rrect
@@ -342,7 +342,7 @@
   (volatile! {:dragging? false}))
 
 (defn particle-graph-with-controls [{:keys [*state] :as model}]
-  (def model model)
+  ;; (def model model)
   (ui/dynamic
    ctx [{:keys [font-ui fill-text]} ctx]
    (let [aslider
@@ -458,7 +458,7 @@
                                        :distribute-spring? true}})
         *draw-state (volatile! {:nodes {}
                                 :t (System/currentTimeMillis)})]
-    (def --ds *draw-state)
+    ;; (def --ds *draw-state)
     {:*state *state :*draw-state *draw-state}))
 
 (defn particle-graph [state]

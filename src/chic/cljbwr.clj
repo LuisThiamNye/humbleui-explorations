@@ -1,7 +1,9 @@
 (ns chic.cljbwr
   (:require
+   [chic.clj.source :as clj.source]
    [chic.text-editor :as text-editor]
    [chic.text-editor.core :as text-editor.core]
+   [chic.ui.layout :as cuilay]
    [clojure.repl :as repl]
    [clojure.string :as str]
    [io.github.humbleui.ui :as ui])
@@ -56,27 +58,27 @@
             (doto (Paint.) (.setColor (unchecked-int (if (and selected-ns (= ns selected-ns))
                                                        0xFFC0FF90
                                                        0x00000000))))
-            (ui/padding
+            (cuilay/padding
              2 5
              (ui/label string font-ui (cond-> fill-text
                                         (nil? ns)
                                         (-> .makeClone (doto (.setAlpha (unchecked-int 0x90))))))))]
-    (ui/column
+    (cuilay/column
      (if ns
        (ui/clickable
         #(reset! *selected-ns ns)
         el)
        el)
      (when children
-       (ui/row
+       (cuilay/row
         (ui/gap 10 0)
         [:stretch 1
-         (ui/column
+         (cuilay/column
           (map (fn [child] (ns-list-item ctx child)) children))])))))
 
 (defn ns-list-view []
-  (ui/vscrollbar
-   (ui/vscroll
+  (cuilay/vscrollbar
+   (cuilay/vscroll
     (ui/dynamic ctx [font-ui (:font-ui ctx)
                      fill-text (:fill-text ctx)
                      selected-ns @*selected-ns]
@@ -90,13 +92,13 @@
                  (ui/gap 0 30))))))
 
 (defn ns-interns-view []
-  (ui/vscrollbar
-   (ui/vscroll
+  (cuilay/vscrollbar
+   (cuilay/vscroll
     (ui/dynamic ctx [font-ui (:font-ui ctx)
                      fill-text (:fill-text ctx)
                      selected-ns @*selected-ns
                      selected-member @*selected-member]
-                (ui/column
+                (cuilay/column
                  (for [avar (when selected-ns
                               (sort-by (comp name symbol) (vals (ns-interns selected-ns))))]
                    (ui/clickable
@@ -105,7 +107,7 @@
                      (doto (Paint.) (.setColor (unchecked-int (if (= avar selected-member)
                                                                 0xFFC0FF90
                                                                 0x00000000))))
-                     (ui/padding
+                     (cuilay/padding
                       2 5
                       (ui/label (name (symbol avar)) font-ui fill-text)))))
                  #_(ui/padding
@@ -118,13 +120,14 @@
    ctx [member @*selected-member
         font-ui (:font-ui ctx)
         fill-text (:fill-text ctx)]
-   (let [jar? (str/starts-with?
-               (str (.getResource (clojure.lang.RT/baseLoader) (:file (meta member))))
-               "jar")]
+    (let [jar? (when-let [f (:file (meta member))]
+                 (str/starts-with?
+                  (str (.getResource (.getClassLoader (Class/forName "clojure.lang.Compiler")) f))
+                  "jar"))]
      (if member
-      (ui/padding
+      (cuilay/padding
        5 5
-       (if-let [ext-src (and jar? (repl/source-fn (symbol member)))]
+       (if-let [ext-src (and #_jar? (clj.source/crude-source-of-var member))]
          (text-editor/element (text-editor.core/make {:content ext-src :pos 0}))
          (ui/label "No source available" font-ui fill-text)))
       (ui/gap 0 0)))))

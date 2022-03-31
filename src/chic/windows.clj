@@ -148,4 +148,4 @@
     (:window-obj w)))
 
 (defn request-frame [{:keys [window-obj]}]
-  (huiwin/request-frame window-obj))
+  (hui/doui (huiwin/request-frame window-obj)))

@@ -1,8 +1,5 @@
 (ns chic.main
   (:require
-   [chic.depview :as depview]
-   [chic.cljbwr :as cljbwr]
-   [chic.filebwr :as filebwr]
    [chic.focus :as focus]
    [chic.style :as style]
    [chic.ui :as cui]
@@ -67,7 +64,7 @@
         (cuilay/column
          [:stretch 1
           (cui/dyncomp
-           (depview/basic-view))]
+           (demo/basic-view))]
          #_[:stretch 1
             (ui/gap 0 0)]
          (cuilay/height
@@ -121,11 +118,13 @@
              :window-obj huiwin/close)
      (make-main-window)))
 
-  (chic.windows/request-frame (first (vals @windows/*windows)))
+  (def x (hui/doui-async (chic.windows/request-frame (first (vals @windows/*windows)))))
+  (def x (hui/doui-async 5))
 
   @(:*ctx (first (vals @windows/*windows)))
   (:*ui-error (second (vals @windows/*windows)))
   ( @*app-root)
+  (io.github.humbleui.protocols/-draw (build-app-root) )
 
   (remount-app)
 

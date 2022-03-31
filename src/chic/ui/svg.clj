@@ -1,6 +1,5 @@
 (ns chic.ui.svg
   (:require
-   [babashka.fs :as fs]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]])
   (:import
@@ -33,20 +32,19 @@
            (.render dom canvas)
            (.restoreToCount canvas layer)))
 
-  (-event [_ event])
+  (-event [_ _event])
 
   AutoCloseable
-  (close [_]
-         #_(.close line)))
+  (close [_]))
 
-(defn file->svgdom [f]
+#_(defn file->svgdom [f]
   (let [data-bytes(fs/read-all-bytes f)
         data (Data/makeFromBytes data-bytes)
         svgdom (SVGDOM. data)]
     svgdom))
 
-(defn make [file]
-  (->Svg (file->svgdom file)))
+(defn make [^Data data]
+  (->Svg (SVGDOM. data)))
 
 (comment
 

@@ -28,7 +28,7 @@
     (alter-meta! v (fn [m]
                      (update m :file
                              (fn [f]
-                               (str/replace f #"/Volumes/House/prg/chic/src/" ""))))))
+                               (str/replace f (str (System/getProperty "user.dir") "/src/") ""))))))
   (try
     (push-thread-bindings {Compiler/LOADER (.getClassLoader Compiler)})
     (repl/source-fn (symbol v))
@@ -37,9 +37,10 @@
       (pop-thread-bindings))))
 
 (comment
+  (crude-source-of-var #'read-var-source-code)
   (read-var-source-code #'chic.cljbwr/basic-view)
-  (meta #'chic.main/app)
-  (meta #'chic.cljbwr/basic-view)
+  (meta #'chic.main/-main)
+  (meta #'chic.clj.source/reader-skip-lines)
 
   (meta *ns*)
 
@@ -58,7 +59,7 @@
                (fn [m]
                  (update m :file
                          (fn [f]
-                           (str/replace f #"/Volumes/House/prg/chic/src/" "")))))
+                           (str/replace f (str (System/getProperty "user.dir") "/src/") "")))))
 
   (def lspthing (lsp.api/analyze-project-and-deps! {:file (io/file ".")}))
   (chic.debug/println-main (:message (lsp.api/diagnostics {:namespace '[chic.cljbwr]
