@@ -1,15 +1,14 @@
 (ns chic.ui.layout
   (:require
+   [chic.ui :as cui :refer [draw-child measure-child]]
    [clojure.math :as math]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui]
-   [chic.ui :as cui :refer [draw-child measure-child child-ctx]])
+   [io.github.humbleui.ui :as ui])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
-   [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.skija Canvas Paint]
+   [io.github.humbleui.types IPoint IRect Rect]
+   [java.lang AutoCloseable]))
 
 (deftype+ HAlign [child-coeff coeff child ^:mut child-rect]
   IComponent
@@ -242,8 +241,8 @@
                top' (ui/dimension top cs ctx)
                bottom' (ui/dimension bottom cs ctx)
                layer (.save canvas)
-               width' (- (:width cs) left' right')
-               height' (- (:height cs) top' bottom')]
+               width' (max 0 (- (:width cs) left' right'))
+               height' (max 0 (- (:height cs) top' bottom'))]
            (set! child-rect (IRect/makeXYWH left' top' width' height'))
            (try
              (.translate canvas left' top')

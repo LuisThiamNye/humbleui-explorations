@@ -2,13 +2,12 @@
   (:require
    [chic.ui :as cui]
    [io.github.humbleui.core :as hui :refer [deftype+]]
-   [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui])
+   [io.github.humbleui.protocols :as huip :refer [IComponent]])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
    [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.skija.shaper Shaper ShapingOptions]
+   [io.github.humbleui.types IPoint]
+   [java.lang AutoCloseable]))
 
 ;; (defprotocol PDrawableTextSpan
 ;;   (draw-text [_ canvas]))

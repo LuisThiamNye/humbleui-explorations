@@ -1,23 +1,14 @@
 (ns chic.error.stacktrace
   (:require
+   [chic.clj.source :as clj.source]
    [chic.debug :as debug]
+   [chic.style :as style]
    [chic.ui :as cui]
-   [chic.ui.layout :as cuilay]
    [clojure.repl :as repl]
    [clojure.string :as str]
-   [chic.clj.source :as clj.source]
-   [chic.style :as style]
-   [chic.focus :as focus]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [io.github.humbleui.window :as huiwin]
    [io.github.humbleui.ui :as ui])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Image Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint Rect]))
+   [io.github.humbleui.skija Font Paint]))
 
 (defn expandable-item [toggle contents]
   (let [*expanded? (volatile! false)]

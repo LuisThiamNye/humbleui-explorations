@@ -1,17 +1,13 @@
 (ns chic.ui.svg
   (:require
    [babashka.fs :as fs]
-   [clojure.reflect :as reflect]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
-   [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine Data]
-   (io.github.humbleui.skija.impl Stats Native)
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]
-   (java.nio.file Files OpenOption)
-   (io.github.humbleui.skija.svg SVGLengthContext SVGDOM SVGLengthType)))
+   [io.github.humbleui.skija Canvas Data]
+   (io.github.humbleui.skija.svg SVGLengthContext SVGDOM SVGLengthType)
+   [io.github.humbleui.types IPoint Point]
+   [java.lang AutoCloseable]))
 
 (deftype+ Svg [^SVGDOM dom]
   IComponent

@@ -4,10 +4,9 @@
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
    [io.github.humbleui.ui :as ui])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
-   [io.github.humbleui.skija Bitmap Canvas Font FontMetrics Paint TextLine ImageInfo ColorAlphaType]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.skija Canvas]
+   [io.github.humbleui.types IPoint IRect]
+   [java.lang AutoCloseable]))
 
 (defn point-in-component? [{offset :chic.ui/component-pos
                             cs :chic.ui/component-rect} pos]

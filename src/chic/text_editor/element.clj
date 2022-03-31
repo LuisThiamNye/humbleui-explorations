@@ -1,27 +1,17 @@
 (ns chic.text-editor.element
   (:require
-   [clojure.math :as math]
-   [chic.text-editor :as text-editor :refer [PTextEditor_Element PTextEditor_Move]]
-   [clojure.string :as str]
-   [chic.key :as key]
    [chic.focus :as focus]
+   [chic.text-editor :as text-editor :refer [PTextEditor_Element]]
    [chic.ui.focusable :as focusable]
-   [chic.keybindings :as keybindings]
+   [clojure.math :as math]
    [io.github.humbleui.core :as hui :refer [deftype+]]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [io.github.humbleui.window :as window]
-   [io.github.humbleui.ui :as ui]
-   [io.github.humbleui.protocols :as huip :refer [IComponent]])
+   [io.github.humbleui.protocols :as huip :refer [IComponent]]
+   [io.github.humbleui.ui :as ui])
   (:import
-   [java.lang AutoCloseable]
    (chic.text_editor TextEditor)
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window Key KeyModifier]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode TextLine FontMetrics]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]))
+   [io.github.humbleui.skija Canvas Paint TextLine]
+   [io.github.humbleui.types IPoint IRect]
+   [java.lang AutoCloseable]))
 
 (defn editor-on-key-down [self focus-manager evt]
   (when (focus/has-focus? focus-manager (:focus-node self))

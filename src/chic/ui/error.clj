@@ -1,17 +1,15 @@
 (ns chic.ui.error
   (:require
    [chic.error :as error]
+   [chic.style :as style]
+   [chic.ui :as cui]
+   [chic.ui.layout :as cuilay]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui]
-   [chic.style :as style]
-   [chic.ui.layout :as cuilay]
-   [chic.ui :as cui])
+   [io.github.humbleui.ui :as ui])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
-   [io.github.humbleui.skija Bitmap Canvas Font FontMetrics Paint TextLine ImageInfo ColorAlphaType]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.skija Bitmap Font Paint ImageInfo]
+   [java.lang AutoCloseable]))
 
 (defn boundary-draw-error-view [e ctx cs bitmap]
   (let [font-ui (Font. style/face-code-default (float 12))

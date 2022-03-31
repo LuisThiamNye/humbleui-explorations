@@ -1,6 +1,4 @@
-(ns chic.focus
-  (:require
-   [io.github.humbleui.core :refer [deftype+]]))
+(ns chic.focus)
 
 ;; (deftype+ FocusNode [])
 

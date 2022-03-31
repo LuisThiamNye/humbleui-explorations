@@ -1,23 +1,14 @@
 (ns chic.error
   (:require
-   [chic.debug :as debug]
    [chic.error.stacktrace :as error.stacktrace]
+   [chic.style :as style]
    [chic.ui :as cui]
    [chic.ui.layout :as cuilay]
-   [clojure.repl :as repl]
    [clojure.string :as str]
-   [chic.style :as style]
-   [chic.focus :as focus]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [io.github.humbleui.window :as huiwin]
    [io.github.humbleui.ui :as ui])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Image Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint Rect]))
+   [io.github.humbleui.skija Image Font Paint]
+   [io.github.humbleui.types Rect]))
 
 (defprotocol PErrorBoundary
   (reset-error-boundary [_]))

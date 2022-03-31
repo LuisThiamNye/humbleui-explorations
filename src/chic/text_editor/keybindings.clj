@@ -1,26 +1,14 @@
 (ns chic.text-editor.keybindings
   (:require
+   [chic.key :as key]
    [chic.text-editor :as text-editor :refer [PTextEditor_Modes]]
    [chic.text-editor.cursor :as cursor]
-   [chic.text-editor.move :as move]
    [chic.text-editor.line :as line]
-   [clojure.string :as str]
-   [chic.key :as key]
-   [chic.focus :as focus]
-   [chic.ui.focusable :as focusable]
-   [chic.keybindings :as keybindings]
-   [io.github.humbleui.core :as hui :refer [deftype+]]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [io.github.humbleui.window :as window]
-   [io.github.humbleui.ui :as ui])
+   [chic.text-editor.move :as move]
+   [clojure.string :as str])
   (:import
    (chic.text_editor TextEditor)
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window Key KeyModifier]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.jwm EventKey Key KeyModifier]))
 
 (defn handle-keydown-normal-mode [self evt]
   (let [ek ^EventKey (:eventkey evt)

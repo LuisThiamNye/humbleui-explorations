@@ -1,21 +1,6 @@
 (ns chic.text-editor
   (:require
-   [clojure.string :as str]
-   [chic.key :as key]
-   [chic.focus :as focus]
-   [chic.ui.focusable :as focusable]
-   [chic.keybindings :as keybindings]
-   [io.github.humbleui.core :as hui :refer [deftype+]]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [io.github.humbleui.window :as window]
-   [io.github.humbleui.ui :as ui])
-  (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window Key KeyModifier]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.core :as hui :refer [deftype+]]))
 
 (deftype+ TextEditor [^clojure.lang.Atom state ^:mut focus-node])
 

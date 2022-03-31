@@ -1,18 +1,15 @@
 (ns chic.ui.subpixel
   (:require
-   [clojure.math :as math]
    [chic.ui :as cui]
-   [chic.ui.text :as cui.text]
    [chic.ui.layout :as cuilay]
+   [chic.ui.text :as cui.text]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui]
-   [chic.text-editor.line :as line])
+   [io.github.humbleui.ui :as ui])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
    [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.types Point Rect]
+   [java.lang AutoCloseable]))
 
 (defn event-propagate
   ([event child child-rect]

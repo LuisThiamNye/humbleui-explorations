@@ -1,18 +1,15 @@
 (ns chic.text-editor.core
   (:require
-   [clojure.string :as str]
-   [chic.text-editor.move]
-   [chic.text-editor.delete]
-   [chic.text-editor.keybindings :as keybindings]
+   [chic.text-editor :as text-editor :refer [->TextEditor]]
    [chic.text-editor.cursor]
-   [chic.text-editor.insert]
+   [chic.text-editor.delete]
    [chic.text-editor.element]
-   [chic.text-editor :as text-editor :refer [->TextEditor]])
+   [chic.text-editor.insert]
+   [chic.text-editor.keybindings :as keybindings]
+   [chic.text-editor.move]
+   [clojure.string :as str])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.skija FontMgr FontStyle]))
 
 (defn make [opts]
   (let [lines (str/split-lines (:content opts ""))

@@ -1,37 +1,17 @@
 (ns chic.depview
   (:require
    [chic.graph :as graph]
-   [tech.droit.fset :as fset]
-   [babashka.fs :as fs]
-   [clojure.math :as math]
-   [clojure-lsp.api :as lsp]
-   [clj-kondo.core :as kondo]
-   [chic.ui.text-input :as text-input]
-   [taoensso.encore :as enc]
    [chic.ui :as cui]
-   [chic.ui.error :as cui.error]
    [chic.ui.layout :as cuilay]
+   [clj-kondo.core :as kondo]
+   [clojure-lsp.api :as lsp]
    [clojure.java.io :as io]
-   [chic.ui.svg :as ui.svg]
-   [chic.ui.icons.material :as maticons]
-   [chic.debug :as debug]
-   [chic.focus :as focus]
-   [chic.clj.source :as source]
+   [clojure.math :as math]
    [clojure.string :as str]
-   [clojure.repl :as repl]
-   [nrepl.server :as nrepl-server]
-   [chic.text-editor :as text-editor]
-   [chic.text-editor.core :as text-editor.core]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [cider.nrepl :refer [cider-nrepl-handler]]
-   [io.github.humbleui.window :as window]
-   [io.github.humbleui.ui :as ui])
+   [io.github.humbleui.ui :as ui]
+   [tech.droit.fset :as fset])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut MouseButton]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
+   [io.github.humbleui.skija Paint]
    [io.github.humbleui.types IPoint IRect]))
 
 (defn namespace->file [ns]
@@ -63,8 +43,8 @@
     (reduce))
 
 
-(defn circular-graph []
-  (let [*state (atom {:nodes {}#_nodes})
+(defn circular-graph [{:keys [nodes]}]
+  (let [*state (atom {:nodes nodes})
         *draw-state (volatile! {})
         line-paint (doto (Paint.) (.setStrokeWidth 2.) (.setColor (unchecked-int 0xFF30c0c0)))]
     (ui/dynamic
@@ -109,8 +89,8 @@
            (ui/contextual
             (fn [ctx]
               (let [children (mapv #(% ctx) children-ctors)
-                    radius (/ (min (- (:width cs) (apply max (map (comp :width :size) children)))
-                                   (- (:height cs) (* 2(apply max (map (comp :height :size) children)))))
+                    radius (/ (min (- (:width cs) (reduce max 0 (map (comp :width :size) children)))
+                                   (- (:height cs) (* 2(reduce max 0 (map (comp :height :size) children)))))
                               2)
                     graph-centre (IPoint. (/ (:width cs) 2)
                                           (/ (:height cs) 2))
@@ -178,19 +158,37 @@
                                                       :protocol-impls false
                                                       :java-class-definitions false}
                                            :canonical-paths true}}})))
-  (def connections
-    (bump-popularity (get-connections ana) "chic.main"))
-  (def graph-nodes
-    (let [connections (get-connections ana)]
-      (filter-nodes
-      #(str/starts-with? (:label % "") "chic")
+
+  (defn ana->nodes []
+    #_(let [connections (get-connections ana)]
       (let [all-ids (into #{} (map hash) (keys connections))]
         (into {}
               (map (fn [[ns {:keys [nodes]}]]
                      [(hash ns) {:connected-nodes
                                  (into #{} (comp (map hash) (filter all-ids)) nodes)
                                  :label ns}]))
-              connections)))))
+              connections)))
+    (let [connections (get-connections ana)]
+      (let [all-ids (into #{} (map hash) (keys connections))]
+        (reduce (fn [db [ns {:keys [nodes]}]]
+                  (let [db (reduce (fn [db ns]
+                                     (assert (some? ns))
+                                     (if (contains? db (hash ns))
+                                       db
+                                       (assoc db (hash ns) {:connected-nodes #{}
+                                                            :label ns})))
+                                   db
+                                   (conj nodes ns))]
+                    (assoc-in db [(hash ns) :connected-nodes]
+                              (into #{} (map hash) nodes))))
+                {}
+                connections))))
+  (def graph-nodes
+    (filter-nodes
+     #(str/starts-with? (:label % "") "chic")
+     (ana->nodes)))
+  (def graph-nodes (ana->nodes))
+  (map :label (vals graph-nodes))
 
   (map (fn [[n m]]
          [n (:popularity m)])
@@ -200,17 +198,25 @@
 
   (first (filter #(= (str (:to %)) "chic.main") (filter #(= (str (:from %)) "chic.main") (:namespace-usages ana))))
 
-  (def nodes
-    (let [pred ]
-      ))
+  (def circle-nodes
+    (let [pred #(str/starts-with? (:label % "") "chic")]
+      (let [connections (bump-popularity (get-connections ana) "chic.main")]
+          (let [all-ids (into #{} (keys connections))]
+            (into {}
+                  (map (fn [[ns {:keys [nodes]}]]
+                         [ns {:nodes
+                                     (into #{} (comp (filter all-ids)) nodes)
+                                     :label ns}]))
+                  connections)))))
   #!
   )
 (defonce graph-nodes {})
+(defonce circle-nodes {})
 
 (defn basic-view []
   (let [graph-state (graph/particle-graph-new-state graph-nodes)]
     (cui/dyncomp
-    #_(circular-graph)
+     #_(circular-graph {:nodes circle-nodes})
     (graph/particle-graph graph-state))))
 
 (comment

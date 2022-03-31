@@ -1,9 +1,6 @@
 (ns chic.style
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.skija FontMgr FontStyle Typeface]))
 
 (def ^Typeface face-default
   (.matchFamiliesStyle (FontMgr/getDefault)

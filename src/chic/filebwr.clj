@@ -1,34 +1,20 @@
 (ns chic.filebwr
   (:require
    [babashka.fs :as fs]
-   [chic.ui.text-input :as text-input]
-   [taoensso.encore :as enc]
-   [chic.ui :as cui]
-   [chic.ui.error :as cui.error]
-   [chic.ui.layout :as cuilay]
-   [clojure.java.io :as io]
-   [chic.ui.svg :as ui.svg]
-   [chic.ui.icons.material :as maticons]
-   [chic.debug :as debug]
-   [chic.focus :as focus]
-   [chic.clj.source :as source]
-   [clojure.string :as str]
-   [clojure.repl :as repl]
-   [nrepl.server :as nrepl-server]
    [chic.text-editor :as text-editor]
    [chic.text-editor.core :as text-editor.core]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [cider.nrepl :refer [cider-nrepl-handler]]
-   [io.github.humbleui.window :as window]
+   [chic.ui :as cui]
+   [chic.ui.error :as cui.error]
+   [chic.ui.icons.material :as maticons]
+   [chic.ui.layout :as cuilay]
+   [chic.ui.svg :as ui.svg]
+   [chic.ui.text-input :as text-input]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
    [io.github.humbleui.ui :as ui])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut MouseButton]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.jwm MouseButton]
+   [io.github.humbleui.skija Paint]))
 
 (def *selected-file (atom nil))
 (def *directory (atom (io/file ".")))

@@ -1,24 +1,6 @@
 (ns chic.text-editor.cursor
   (:require
-   [chic.text-editor :as text-editor :refer [PTextEditor_Pos]]
-   [chic.text-editor.line :as line]
-   [clojure.string :as str]
-   [chic.key :as key]
-   [chic.focus :as focus]
-   [chic.ui.focusable :as focusable]
-   [chic.keybindings :as keybindings]
-   [io.github.humbleui.core :as hui :refer [deftype+]]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [io.github.humbleui.window :as window]
-   [io.github.humbleui.ui :as ui])
-  (:import
-   (chic.text_editor TextEditor)
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window Key KeyModifier]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode TextLine]
-   [io.github.humbleui.types IPoint]))
+   [chic.text-editor.line :as line]))
 
 (defn cursors-indexed [sm]
   (eduction (map-indexed (fn [i c]

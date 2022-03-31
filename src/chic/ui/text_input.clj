@@ -1,27 +1,24 @@
 (ns chic.ui.text-input
   (:require
-   [taoensso.encore :as enc]
-   [clojure.math :as math]
-   [chic.windows :as windows]
-   [chic.text-editor.line :as text-editor.line]
    [chic.focus :as focus]
-   [clojure.string :as str]
    [chic.key :as key]
+   [chic.text-editor.line :as text-editor.line]
+   [chic.ui :as cui]
    [chic.ui.focusable :as focusable]
    [chic.ui.layout :as cuilay]
-   [chic.ui.text :as cui.text]
    [chic.ui.subpixel :as cui.subpixel]
+   [chic.ui.text :as cui.text]
+   [chic.windows :as windows]
+   [clojure.math :as math]
+   [clojure.string :as str]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
    [io.github.humbleui.ui :as ui]
-   [chic.ui :as cui])
+   [taoensso.encore :as enc])
   (:import
-   [java.lang AutoCloseable]
-   [io.github.humbleui.types IPoint IRect Point Rect RRect]
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window Key KeyModifier MouseButton]
-   [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine]
-   [io.github.humbleui.skija.shaper Shaper ShapingOptions]))
+   [io.github.humbleui.jwm EventKey Key KeyModifier MouseButton]
+   [io.github.humbleui.skija Canvas Paint TextLine]
+   [java.lang AutoCloseable]))
 
 (deftype+ TextInput [get-text]
   IComponent

@@ -1,25 +1,12 @@
 (ns chic.cljbwr
   (:require
-   [chic.debug :as debug]
-   [chic.focus :as focus]
-   [chic.clj.source :as source]
-   [clojure.string :as str]
-   [clojure.repl :as repl]
-   [nrepl.server :as nrepl-server]
    [chic.text-editor :as text-editor]
    [chic.text-editor.core :as text-editor.core]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
-   [cider.nrepl :refer [cider-nrepl-handler]]
-   [io.github.humbleui.window :as window]
+   [clojure.repl :as repl]
+   [clojure.string :as str]
    [io.github.humbleui.ui :as ui])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.skija Paint]))
 
 #_(def editor (text-editor.core/make
                {:pos 0

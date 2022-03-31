@@ -1,11 +1,11 @@
 (ns chic.clj.source
   (:require
-   [clojure.repl :as repl]
-   [clojure.string :as str]
-   [clojure.java.io :as io]
+   [clojure-lsp.api :as lsp.api]
    [clojure-lsp.db :as lsp.db]
    [clojure-lsp.handlers :as lsp.handlers]
-   [clojure-lsp.api :as lsp.api])
+   [clojure.java.io :as io]
+   [clojure.repl :as repl]
+   [clojure.string :as str])
   (:import
    (java.io Reader PushbackReader)))
 

@@ -1,21 +1,20 @@
 (ns chic.windows
   (:require
-   [io.github.humbleui.core :as hui]
    [chic.debug :as debug]
-   [chic.style :as style]
    [chic.error :as error]
-   [chic.ui.error :as cui.error]
-   [chic.ui :as cui]
-   [chic.ui.layout :as cuilay]
    [chic.error.stacktrace :as error.stacktrace]
-   [clojure.string :as str]
+   [chic.style :as style]
+   [chic.ui :as cui]
+   [chic.ui.error :as cui.error]
+   [chic.ui.layout :as cuilay]
+   [io.github.humbleui.core :as hui]
    [io.github.humbleui.profile :as profile]
-   [io.github.humbleui.window :as huiwin]
-   [io.github.humbleui.ui :as ui])
+   [io.github.humbleui.ui :as ui]
+   [io.github.humbleui.window :as huiwin])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
+   [io.github.humbleui.jwm EventMouseButton EventMouseMove EventMouseScroll
+    EventKey EventWindowFocusOut]
+   [io.github.humbleui.skija Canvas Font Paint]
    [io.github.humbleui.types IPoint]))
 
 (defonce *windows (atom {}))

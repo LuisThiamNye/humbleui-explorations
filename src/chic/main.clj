@@ -1,31 +1,19 @@
 (ns chic.main
   (:require
-   [chic.debug :as debug]
+   [chic.depview :as depview]
+   [chic.focus :as focus]
+   [chic.style :as style]
    [chic.ui :as cui]
    [chic.ui.layout :as cuilay]
-   [clojure.string :as str]
-   [chic.filebwr :as filebwr]
-   [chic.error :as error]
-   [chic.cljbwr :as cljbwr]
-   [chic.depview :as depview]
    [chic.windows :as windows]
-   [chic.focus :as focus]
-   [nrepl.server :as nrepl-server]
-   [chic.text-editor :as text-editor]
-   [chic.text-editor.core :as text-editor.core]
-   [io.github.humbleui.core :as hui]
-   [io.github.humbleui.paint :as paint]
-   [io.github.humbleui.profile :as profile]
-   [nrepl.cmdline :as nrepl]
    [cider.nrepl :refer [cider-nrepl-handler]]
-   [chic.style :as style]
+   [io.github.humbleui.core :as hui]
+   [io.github.humbleui.ui :as ui]
    [io.github.humbleui.window :as huiwin]
-   [io.github.humbleui.ui :as ui])
+   [nrepl.cmdline :as nrepl]
+   [nrepl.server :as nrepl-server])
   (:import
-   [io.github.humbleui.jwm App EventFrame EventMouseButton EventMouseMove EventMouseScroll
-    EventKey Window EventWindowFocusOut]
-   [io.github.humbleui.skija Canvas FontMgr FontStyle Typeface Font Paint PaintMode]
-   [io.github.humbleui.types IPoint]))
+   [io.github.humbleui.skija Font Paint]))
 
 (def *pressed-keys (volatile! #{}))
 (def focus-manager (focus/new-manager))
