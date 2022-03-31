@@ -8,3 +8,4 @@ zig-cache
 .cpcache
 *~undo-tree~
 .nrepl-port
+.#*

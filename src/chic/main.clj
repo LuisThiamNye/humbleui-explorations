@@ -1,6 +1,8 @@
 (ns chic.main
   (:require
    [chic.depview :as depview]
+   [chic.cljbwr :as cljbwr]
+   [chic.filebwr :as filebwr]
    [chic.focus :as focus]
    [chic.style :as style]
    [chic.ui :as cui]

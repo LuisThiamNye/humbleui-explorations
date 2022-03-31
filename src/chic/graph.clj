@@ -88,7 +88,7 @@
                            (vswap! *accel
                                    #(-> %
                                         (cond->
-                                          (or repel-connected? (not connected-to-this-node?))
+                                         (or repel-connected? (not connected-to-this-node?))
                                           (vadd (vscale (dist->acc-repel dist) diff-unit)))
                                         (cond-> connected-to-this-node?
                                           (-> (vadd (vscale (cond-> (dist->acc-attract dist)
@@ -135,6 +135,12 @@
                 (let [radius (min (/ width 2) (/ height 2))]
                   (.drawCircle canvas radius radius radius paint)))}))
 
+(defn node-connects-to? [nodes fromid toid]
+  (some (fn [childid]
+          (or (= childid toid)
+              (node-connects-to? nodes childid toid)))
+        (:connected-nodes (get nodes fromid))))
+
 (defn particle-graph* [{:keys [*state *draw-state]}]
   (let [radius 7
         line-paint (doto (Paint.)
@@ -166,6 +172,7 @@
       (ui/dynamic
        ctx [nodes (:nodes @*state)
             _ (:physics-params @*state)
+            {:keys [view-config]} @*state
             vnodes (:nodes @*draw-state)
             window (:chic/current-window ctx)
             {:keys [font-ui fill-text]} ctx]
@@ -174,6 +181,7 @@
                (enc/after-timeout 14
                                   (try (particle-graph-do-physics nodes *state *draw-state)
                                        (catch Exception e
+                                         (println (str "at: " (java.util.Date.)))
                                          (prn e)))
                                   (windows/request-frame window)))
        (cuilay/size-dependent
@@ -187,25 +195,35 @@
              radius
              (cuilay/stack
               (eduction
-               (map (fn [[id node]]
-                      (let [pos1 (:position (get vnodes id))]
-                        (eduction
-                         (map (fn [connected-id]
-                                (ui/custom-ui
-                                 (:width cs) (:height cs)
-                                 {:on-paint (fn [canvas _width _height]
-                                              (let [pos2 (:position (get vnodes connected-id))]
-                                                (.drawLine canvas
-                                                           (:x pos1) (:y pos1)
-                                                           (:x pos2) (:y pos2)
-                                                           (doto (Paint.)
-                                                             (.setStrokeWidth 1.5)
-                                                             (.setShader (Shader/makeLinearGradient
-                                                                          (float (:x pos1)) (float (:y pos1))
-                                                                          (float (:x pos2)) (float (:y pos2))
-                                                                          (int-array 2 [(unchecked-int 0xC00047ff)
-                                                                                        (unchecked-int 0xC0ff9900)])))))))})))
-                         (:connected-nodes node)))))
+               (map
+                (fn [[id {:keys [connected-nodes]}]]
+                  (let [pos1 (:position (get vnodes id))]
+                    (eduction
+                     (map
+                      (fn [connected-id]
+                        (let [secondary? (and (:suppress-shortcuts? view-config)
+                                              (some #(node-connects-to? nodes % connected-id)
+                                                connected-nodes))]
+                          (ui/custom-ui
+                          (:width cs) (:height cs)
+                          {:on-paint
+                           (fn [canvas _width _height]
+                             (let [pos2 (:position (get vnodes connected-id))]
+                               (.drawLine
+                                canvas
+                                (:x pos1) (:y pos1)
+                                (:x pos2) (:y pos2)
+                                (doto (Paint.)
+                                  (.setStrokeWidth (if secondary? 1 1.5))
+                                  (.setShader (Shader/makeLinearGradient
+                                               (float (:x pos1)) (float (:y pos1))
+                                               (float (:x pos2)) (float (:y pos2))
+                                               (int-array 2 (if secondary?
+                                                              [(unchecked-int 0x400047ff)
+                                                               (unchecked-int 0x40ff9900)]
+                                                              [(unchecked-int 0xD00047ff)
+                                                               (unchecked-int 0xD0ff9900)]))))))))}))))
+                     connected-nodes))))
                nodes)))
             (eduction
              (map (fn [[id node]]
@@ -318,20 +336,21 @@
                (ui/padding
                 2 (ui/clip-rrect
                    2 (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFFFFFFFF)))
-                            (ui/gap 0 0)))))))))
+                              (ui/gap 0 0)))))))))
 
 (defn initial-slider-state []
   (volatile! {:dragging? false}))
 
 (defn particle-graph-with-controls [{:keys [*state] :as model}]
+  (def model model)
   (ui/dynamic
    ctx [{:keys [font-ui fill-text]} ctx]
    (let [aslider
-         (fn [paramkey {:keys [min-limit max-limit label state]}]
+         (fn [paramkeyvec {:keys [min-limit max-limit label state]}]
            (let [state (initial-slider-state)]
              [:stretch 1
               (ui/dynamic
-               _ [param (get (:physics-params @*state) paramkey)]
+                _ [param (get-in @*state paramkeyvec)]
                (cuilay/padding
                 1 0
                 (cuilay/column
@@ -348,17 +367,17 @@
                              (/ (math/log (/ param min-limit))
                                 (math/log (/ max-limit min-limit))))
                     :on-change (fn [value]
-                                 (swap! *state assoc-in [:physics-params paramkey]
+                                 (swap! *state assoc-in paramkeyvec
                                         (if (zero? min-limit)
                                           (unchecked-add min-limit
                                                          (unchecked-multiply (float value) (- max-limit min-limit)))
                                           (* min-limit (math/pow (/ max-limit min-limit)
                                                                  (float value))))))})))))]))
          acheckbox
-         (fn [paramkey {:keys [label]}]
+         (fn [paramkeyvec {:keys [label]}]
            (ui/dynamic
-             _ [checked? (get (:physics-params @*state) paramkey)]
-             (cui/dyncomp
+             _ [checked? (get-in @*state paramkeyvec)]
+            (cui/dyncomp
              (cuilay/padding
               1 0 (ui/valign
                    0.5 (cuilay/row
@@ -367,7 +386,7 @@
                              18 (checkbox
                                  {:checked? checked?
                                   :on-change (fn [checked?]
-                                               (swap! *state assoc-in [:physics-params paramkey] checked?))})))
+                                               (swap! *state assoc-in paramkeyvec checked?))})))
                         (ui/padding
                          5 4 (ui/label label font-ui fill-text))))))))
          speed-slider-state (initial-slider-state)
@@ -379,26 +398,27 @@
        (cui/dyncomp (particle-graph* model))]
       (ui/gap 0 5)
       (cuilay/row
-       (acheckbox :compression? {:label "compression"})
-       (acheckbox :repel-connected? {:label "repel connected"})
-       (acheckbox :distribute-spring? {:label "distribute spring"}))
+       (acheckbox [:physics-params :compression?] {:label "compression"})
+       (acheckbox [:physics-params :repel-connected?] {:label "repel connected"})
+       (acheckbox [:physics-params :distribute-spring?] {:label "distribute spring"})
+       (acheckbox [:view-config :suppress-shortcuts?] {:label "suppress shortcuts"}))
       (cuilay/row
-       (aslider :attraction-coeff {:label "stiffness" :min-limit 1 :max-limit 1000
+       (aslider [:physics-params :attraction-coeff] {:label "stiffness" :min-limit 1 :max-limit 1000
                                    :state attraction-slider-state})
-       (aslider :attraction-deadzone {:label "natural length" :min-limit 01 :max-limit 1000})
-       (aslider :repulsion-coeff {:label "repulsion" :min-limit 100 :max-limit 100000000
+       (aslider [:physics-params :attraction-deadzone] {:label "natural length" :min-limit 01 :max-limit 1000})
+       (aslider [:physics-params :repulsion-coeff] {:label "repulsion" :min-limit 100 :max-limit 100000000
                                   :state repulsion-slider-state})
-       (aslider :repel-range {:label "repel-range" :min-limit 0 :max-limit 1000}))
+       (aslider [:physics-params :repel-range] {:label "repel-range" :min-limit 0 :max-limit 1000}))
       (cuilay/row
-       (aslider :time-scale {:label "speed" :min-limit 0.001 :max-limit 0.01
+       (aslider [:physics-params :time-scale] {:label "speed" :min-limit 0.001 :max-limit 0.01
                              :state speed-slider-state})
-       (aslider :friction-coeff {:label "friction" :min-limit 0.1 :max-limit 100
+       (aslider [:physics-params :friction-coeff] {:label "friction" :min-limit 0.1 :max-limit 100
                                  :state friction-slider-state})
-       (aslider :sorting-buffer {:label "sorting buffer" :min-limit 0 :max-limit 500
+       (aslider [:physics-params :sorting-buffer] {:label "sorting buffer" :min-limit 0 :max-limit 500
                                  :state friction-slider-state}))
       (cuilay/row
-       (aslider  :min-velocity{:label "min velocity" :min-limit 0.001 :max-limit 1})
-       (aslider :max-velocity  {:label "max velocity" :min-limit 0 :max-limit 10}))))))
+       (aslider [:physics-params :min-velocity] {:label "min velocity" :min-limit 0.001 :max-limit 1})
+       (aslider [:physics-params :max-velocity] {:label "max velocity" :min-limit 0 :max-limit 10}))))))
 
 (comment
   (:nodes @--ds)
@@ -420,11 +440,15 @@
   (let [*state (atom {:nodes nodes
                       :mouse-drag-offset nil
                       :dragging-nodes #{}
+                      :container-size (IPoint. 0 0)
                       :physics-params {:time-scale 0.001
-                                       :attraction-coeff 10
+                                       ;; :attraction-coeff 10
+                                       :attraction-coeff 20
                                        :friction-coeff 8
-                                       :repulsion-coeff 1000000
-                                       :attraction-deadzone 200
+                                       ;; :repulsion-coeff 1000000
+                                       :repulsion-coeff 2350000
+                                       ;; :attraction-deadzone 200
+                                       :attraction-deadzone 50
                                        :repel-range 120
                                        :min-velocity 0.001
                                        :max-velocity 1
