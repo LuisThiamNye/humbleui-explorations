@@ -20,6 +20,7 @@
         com.crypticbutter/snoop {:mvn/version "21-353-alpha"}
         tech.droit/fset {:mvn/version "0.1.1"}
         town.lilac/cascade {:mvn/version "1.2.0"}
+        borkdude/dynaload {:mvn/version "0.2.2"}
         rewrite-clj/rewrite-clj {:mvn/version "1.0.699-alpha"}}
 
  :aliases {

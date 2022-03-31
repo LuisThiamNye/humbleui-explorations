@@ -3,16 +3,19 @@
    [chic.focus :as focus]
    [chic.style :as style]
    [chic.ui :as cui]
+   [chic.demo :as demo]
    [chic.ui.layout :as cuilay]
    [chic.windows :as windows]
-   [cider.nrepl :refer [cider-nrepl-handler]]
    [io.github.humbleui.core :as hui]
+   [borkdude.dynaload :refer [dynaload]]
    [io.github.humbleui.ui :as ui]
    [io.github.humbleui.window :as huiwin]
    [nrepl.cmdline :as nrepl]
    [nrepl.server :as nrepl-server])
   (:import
    [io.github.humbleui.skija Font Paint]))
+
+(def cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler))
 
 (def *pressed-keys (volatile! #{}))
 (def focus-manager (focus/new-manager))
