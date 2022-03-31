@@ -1,6 +1,6 @@
 # Here is some Code
 
-A snapshot of code as I experiment with various things. Unpolished.
+A snapshot of code as I experiment with various things. Unpolished. Enter if you dare.
 
 Usage: `clj -M:dev`
 
