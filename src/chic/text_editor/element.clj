@@ -2,11 +2,13 @@
   (:require
    [chic.focus :as focus]
    [chic.text-editor :as text-editor :refer [PTextEditor_Element]]
+   [chic.ui.layout :as cuilay]
    [chic.ui.focusable :as focusable]
    [clojure.math :as math]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
-   [io.github.humbleui.ui :as ui])
+   [io.github.humbleui.ui :as ui]
+   [chic.ui :as cui])
   (:import
    (chic.text_editor TextEditor)
    [io.github.humbleui.skija Canvas Paint TextLine]
@@ -89,25 +91,24 @@
   (close [_]
          (ui/child-close child)))
 
-(deftype+ TextLineSegment [child ^:mut size ^:mut child-rect]
+(deftype+ TextLineSegment [child ^:mut size]
   IComponent
   (-measure [_ ctx cs]
             (huip/-measure child ctx cs))
 
   (-draw [_ ctx cs ^Canvas canvas]
          (set! size cs)
-         (set! child-rect (IRect/makeXYWH 0 0 (:width cs) (:height cs)))
          (huip/-draw child ctx cs canvas))
 
   (-event [_ event]
-          (ui/event-propagate event child child-rect))
+          (ui/event-propagate event child size))
 
   AutoCloseable
   (close [_]
          (ui/child-close child)))
 
 (defn text-line-segment [child]
-  (->TextLineSegment child nil nil))
+  (->TextLineSegment child nil))
 
 (deftype+ FullTextLine [children ^:mut child-rects]
   IComponent
@@ -139,7 +140,7 @@
                                     :hug (first known)
                                     :stretch (IPoint. (-> space (/ stretch) (* value) (math/round)) (:height cs)))]
                    (when child
-                     (huip/-draw child ctx (assoc child-size :height (:height cs)) canvas))
+                     (huip/-draw child ctx (cui/rect-with-wh cs (assoc child-size :height (:height cs))) canvas))
                    (.translate canvas (:width child-size) 0)
                    (recur
                     (+ width (long (:width child-size)))
@@ -174,13 +175,13 @@
      (text-line-segment
       (if insert-mode?
         (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFF4070D0)))
-                 (ui/padding
+                 (cuilay/padding
                   0 vpadding
                   label))
         (ui/clip-rrect
          2
          (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFFD07040)))
-                  (ui/padding
+                  (cuilay/padding
                    0 vpadding
                    label)))))}))
 
@@ -194,7 +195,7 @@
                            :right-side? false}))
      :ui
      (text-line-segment
-      (ui/padding
+      (cuilay/padding
        0 vpadding
        label))}))
 
@@ -238,7 +239,7 @@
             ctx {:fill-text fill-text :font-code font-code :vpadding vpadding}]
         (ui/on-key-down
          #(editor-on-key-down self focus-manager %)
-         (ui/column
+         (cuilay/column
           (for [line-id line-order]
             (full-text-line self ctx line-id)))))))))
 

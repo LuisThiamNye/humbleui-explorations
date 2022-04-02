@@ -1,7 +1,9 @@
 (ns chic.ui.text-input
   (:require
    [chic.focus :as focus]
+   [io.github.humbleui.paint :as huipaint]
    [chic.key :as key]
+   [chic.ui.event :as uievt]
    [chic.text-editor.line :as text-editor.line]
    [chic.ui :as cui]
    [chic.ui.focusable :as focusable]
@@ -385,7 +387,7 @@
 
 (defn click-text-init [{:keys [*draw-state *state *cursor-state *config]} event]
   (let [idx (.getOffsetAtCoord
-             (:textline @*draw-state)
+             ^TextLine (:textline @*draw-state)
              (:x (cui/component-relative-pos
                   event (update (:chic.ui/mouse-win-pos event)
                                 :x - (left-text-offset @*config)))))]
@@ -399,7 +401,7 @@
 
 (defn handle-mouse-event [ctx {:keys [*state *draw-state *cursor-state] :as model} event]
   (when (and (not (:hui.event.mouse-button/is-pressed event))
-             (identical? MouseButton/PRIMARY (.getButton (:event event))))
+             (identical? MouseButton/PRIMARY (uievt/mouse-button event)))
     (refresh-cursor-animation ctx *cursor-state true)
     (swap! *state (fn [{:keys [cursor-idx selection-idx] :as state}]
                     (-> state
@@ -409,7 +411,7 @@
 
 (defn handle-textspan-click [model event]
   (when (and (:hui.event.mouse-button/is-pressed event)
-             (identical? MouseButton/PRIMARY (.getButton (:event event))))
+             (identical? MouseButton/PRIMARY (uievt/mouse-button event)))
     (click-text-init model event)))
 
 (defn make* []
@@ -469,7 +471,7 @@
              (ui/dynamic
                ctx [state @*state
                     {:keys [left-padding label-subpixel-offset]} @*config]
-               (let [textline (:textline (vswap! *draw-state assoc :textline
+               (let [textline ^TextLine (:textline (vswap! *draw-state assoc :textline
                                                  (cui.text/text-line (:content state) font-ui)))
                      textwidth (.getWidth textline)
                      right-padding 2
@@ -501,7 +503,7 @@
                                 inner-ui
                                 (wrap-mousing-listener
                                  (cuilay/stack
-                                  (ui/padding
+                                  (cuilay/padding
                                    0 4
                                    (cui.subpixel/row
                                     (cui.subpixel/gap (+ left-padding #_label-subpixel-offset) 0)
@@ -509,7 +511,7 @@
                                     (cui.subpixel/gap right-padding 0)))
                                   ;; CURSOR
                                   (if (focus/has-focus? focus-manager focus-node)
-                                    (ui/row
+                                    (cuilay/row
                                      (ui/gap cursor-x 0)
                                      (ui/dynamic _ [{:keys [visible? cursor-blink-interval]} @*cursor-state]
                                        (let [t (System/currentTimeMillis)]
@@ -519,10 +521,10 @@
                                                         cursor-blink-interval))
                                            (refresh-cursor-animation ctx *cursor-state (not visible?) t))
                                          (ui/fill (if selection-idx
-                                                    (doto (Paint.) (.setColor (unchecked-int 0x70000000)))
+                                                    (huipaint/fill 0x70000000)
                                                     (if (:visible? @*cursor-state)
                                                       fill-text
-                                                      (doto (.makeClone fill-text) (.setAlpha 80))))
+                                                      (huipaint/fill 0x50000000)))
                                                   (ui/gap cursor-width 0))))
                                      [:stretch 1 (ui/gap 0 0)])
                                     (enc/do-nil
@@ -531,7 +533,7 @@
                                   (when select-x
                                     (let [start-x (min select-x cursor-x)
                                           end-x (max select-x cursor-x)]
-                                      (ui/row
+                                      (cuilay/row
                                        (ui/gap (cond-> start-x
                                                  (< cursor-idx selection-idx)
                                                  (+ cursor-width)) 0)

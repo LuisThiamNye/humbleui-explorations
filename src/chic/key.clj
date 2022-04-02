@@ -1,6 +1,6 @@
 (ns chic.key
   (:import
-   (io.github.humbleui.jwm EventKey KeyModifier)))
+   (io.github.humbleui.jwm EventKey KeyModifier Key)))
 
 (defn no-modifiers? [^EventKey ek]
   ;; ignore caps lock (bitshift)
@@ -20,11 +20,13 @@
     (== (bit-and-not (.-_modifiers ek) ignore-mask)
         (bit-and-not mod-mask ignore-mask))))
 
-(defn combine [ks]
-  (reduce (fn [acc x] (bit-or acc (.-_mask x))) 0 ks))
-
 (defn mask [k]
-  (.-_mask k))
+  (if (instance? KeyModifier k)
+    (.-_mask ^KeyModifier k)
+    (.-_mask ^Key k)))
+
+(defn combine [ks]
+  (reduce (fn [acc x] (bit-or acc (mask x))) 0 ks))
 
 (comment
   (def eventkey chic.text-editor/eventkey)

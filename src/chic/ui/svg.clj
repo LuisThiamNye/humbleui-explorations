@@ -11,13 +11,9 @@
 (deftype+ Svg [^SVGDOM dom]
   IComponent
   (-measure [_ ctx cs]
-            #_(let [root (.getRoot dom)
-                    lc (SVGLengthContext. (Point. (:x cs) (:y cs)))
-                    width (.resolve lc (.getWidth root) SVGLengthType/HORIZONTAL)
-                    height (.resolve lc (.getHeight root) SVGLengthType/VERTICAL)]
-                (IPoint. (Math/ceil width)
-                         (Math/ceil height)))
-            (IPoint. (unchecked-int 0) (unchecked-int 0)))
+            (let [root (.getRoot dom)
+                  lc (SVGLengthContext. (Point. (:x cs) (:y cs)))]
+                (.getIntrinsicSize root lc)))
 
   (-draw [_ _ctx cs ^Canvas canvas]
          (let [root (.getRoot dom)

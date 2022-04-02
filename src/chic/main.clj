@@ -15,6 +15,8 @@
   (:import
    [io.github.humbleui.skija Font Paint]))
 
+(set! *warn-on-reflection* true)
+
 (def cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler))
 
 (def *pressed-keys (volatile! #{}))
@@ -78,11 +80,13 @@
             key-indicator
             [:stretch 1
              (ui/gap 0 0)]
-            (ui/clickable
-             #(windows/remount-window window)
+            (cui/clickable
+             (fn [event]
+               (when (:hui.event.mouse-button/is-pressed event)
+                 (windows/remount-window window)))
              (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
-                      (ui/valign
-                       0.5 (ui/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
+                      (cuilay/valign
+                       0.5 (cuilay/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
 
 
 
@@ -141,7 +145,8 @@
           "xyz")
   (.println (System/out) "x")
   (.println *out* "x")
+  (require 'chic.main :reload-all)
 
-
+  ;; (hui/doui (alter-var-root #'clojure.core/*warn-on-reflection* (fn [_] true)))
 #!
   )

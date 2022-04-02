@@ -3,6 +3,7 @@
    [chic.graph :as graph]
    [chic.ui :as cui]
    [chic.ui.layout :as cuilay]
+   [io.github.humbleui.paint :as huipaint]
    [clj-kondo.core :as kondo]
    [clojure-lsp.api :as lsp]
    [clojure.java.io :as io]
@@ -11,7 +12,7 @@
    [io.github.humbleui.ui :as ui]
    [tech.droit.fset :as fset])
   (:import
-   [io.github.humbleui.skija Paint]
+   [io.github.humbleui.skija Paint Canvas]
    [io.github.humbleui.types IPoint IRect]))
 
 (defn namespace->file [ns]
@@ -54,18 +55,18 @@
            (for [[id node] (sort-by (comp :popularity val) nodes)]
              (let [circle (ui/custom-ui
                            20 20
-                           {:on-paint (fn [canvas width height]
+                           {:on-paint (fn [^Canvas canvas width height]
                                         (let [radius (min (/ width 2) (/ height 2))]
                                           (.drawCircle canvas radius radius radius
-                                                       (doto (Paint.) (.setColor (unchecked-int 0xFF10b0b0))))))})
-                   label (ui/padding
+                                                       (huipaint/fill 0xFF10b0b0))))})
+                   label (cuilay/padding
                           0 4 0 3 (ui/label id font-ui fill-text))]
                (fn [ctx]
-                 (let [circle-size (cui/measure-child-unbounded circle ctx)
+                 (let [circle-size (cui/measure-child circle ctx 'FIXME)
                        stack (cuilay/->Stack [(cuilay/halign 0.5 circle)
                                               (cuilay/column (ui/gap 0 (:height circle-size))
                                                              label)])
-                       stack-size (cui/measure-child-unbounded stack ctx)]
+                       stack-size (cui/measure-child stack ctx 'FIXME)]
                    {:centre-pos (IPoint. (/ (:width stack-size) 2)
                                          (/ (:height circle-size) 2))
                     :node node
@@ -114,7 +115,7 @@
                         (when other-child
                           (ui/custom-ui
                            (:width cs) (:height cs)
-                           {:on-paint (fn [canvas _width _height]
+                           {:on-paint (fn [^Canvas canvas _width _height]
                                         (.drawLine canvas
                                                    (+ (:x rect) (:x centre-pos))
                                                    (+ (:y rect) (:y centre-pos))
@@ -127,8 +128,8 @@
                      0 (cuilay/valign
                         0 (cuilay/padding
                            (:x rect) (:y rect) 0 0
-                           (ui/width (:width rect)
-                                     (ui/height (:height rect) layer)))))))))))))))))
+                           (cuilay/width (:width rect)
+                                     (cuilay/height (:height rect) layer)))))))))))))))))
 
 (defn filter-nodes [pred nodes]
   (let [good-ids (into #{}
@@ -152,7 +153,7 @@
                                                     :java-class-definitions false}
                                          :canonical-paths true}}})))
 
-(defn ana->nodes []
+(defn ana->nodes [ana]
   #_(let [connections (get-connections ana)]
       (let [all-ids (into #{} (map hash) (keys connections))]
         (into {}
@@ -207,8 +208,8 @@
   )
 (def graph-nodes
   (->>
-   (ana->nodes)
-   #_(filter-nodes
+   (ana->nodes ana)
+   (filter-nodes
       #(str/starts-with? (:label % "") "chic"))))
 ;; (defonce graph-nodes {})
 (defonce circle-nodes {})

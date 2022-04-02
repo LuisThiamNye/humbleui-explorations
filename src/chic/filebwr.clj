@@ -2,6 +2,7 @@
   (:require
    [babashka.fs :as fs]
    [chic.text-editor :as text-editor]
+   [chic.ui.event :as uievt]
    [chic.text-editor.core :as text-editor.core]
    [chic.ui :as cui]
    [chic.ui.error :as cui.error]
@@ -28,12 +29,12 @@
    (cui.error/bound-errors
     (if file
       (if (fs/directory? file)
-        (ui/padding
+        (cuilay/padding
          10 10
-         (ui/row (ui/label "Directory: " font-ui fill-text)
+         (cuilay/row (ui/label "Directory: " font-ui fill-text)
                  (ui/label (str file) font-code fill-text)))
         (let [content (slurp (str file))]
-          (ui/padding
+          (cuilay/padding
            5 5
            (if (< 100000 (count content))
              (ui/label "File too big" font-ui fill-text)
@@ -61,7 +62,7 @@
                            (cuilay/column
                             (cui/clickable
                              (fn [event]
-                               (when (and (identical? MouseButton/PRIMARY (.getButton (:event event)))
+                               (when (and (identical? MouseButton/PRIMARY (uievt/mouse-button event))
                                           (:hui.event.mouse-button/is-pressed event))
                                  (vswap! *expanded? not)))
                              (menu-label "Delete"))
@@ -70,7 +71,7 @@
                                (ui/gap 20 0)
                                (cui/clickable
                                 (fn [event]
-                                  (let [button (.getButton (:event event))]
+                                  (let [button (uievt/mouse-button event)]
                                     (cond
                                       (and (identical? MouseButton/PRIMARY button)
                                            (:hui.event.mouse-button/is-pressed event))
@@ -85,7 +86,7 @@
               (let [main-el
                     (cui/clickable
                      (fn [event]
-                       (let [button (.getButton (:event event))]
+                       (let [button (uievt/mouse-button event)]
                          (cond
                            (identical? MouseButton/PRIMARY button)
                            (when (:hui.event.mouse-button/is-pressed event)
@@ -98,7 +99,7 @@
                         (.setColor (unchecked-int (if (and selected-file (= entry selected-file))
                                                     0xFFC0FF90
                                                     0x00000000))))
-                      (ui/row
+                      (cuilay/row
                        (cuilay/width
                         offset
                         (cuilay/padding
@@ -110,7 +111,7 @@
                                                  (maticons/svg-data "description" "outlined" "24px")))))))
                        (cuilay/padding
                         2 5
-                        (ui/label string font-ui (cond-> fill-text
+                        (ui/label string font-ui (cond-> ^Paint fill-text
                                                    (nil? entry)
                                                    (-> .makeClone (doto (.setAlpha (unchecked-int 0x90))))))))))]
                 (if menu?
@@ -158,7 +159,7 @@
       (cuilay/column
        (cui/dyncomp
         (file-tree-children {:font-ui font-ui :fill-text fill-text} directory-items))
-       #_(ui/padding
+       #_(cuilay/padding
           20 20
           (text-editor/element editor))
        (ui/gap 0 50))))))
@@ -169,8 +170,8 @@
     (ui/clickable
      (fn [] (reset! *directory-items (fs/list-dir @*directory)))
      (cuilay/padding
-      4 4 (ui/height
-           18 (ui/width 18 (ui.svg/make (maticons/svg-data "refresh" "round" "24px"))))))
+      4 4 (cuilay/height
+           18 (cuilay/width 18 (ui.svg/make (maticons/svg-data "refresh" "round" "24px"))))))
     (ui/clickable
      (fn [])
      (cuilay/padding

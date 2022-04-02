@@ -1,6 +1,9 @@
 (ns chic.cljbwr
   (:require
    [chic.clj.source :as clj.source]
+   [io.github.humbleui.paint :as huipaint]
+   [chic.ui :as cui]
+   [chic.ui.event :as uievt]
    [chic.text-editor :as text-editor]
    [chic.text-editor.core :as text-editor.core]
    [chic.ui.layout :as cuilay]
@@ -55,9 +58,9 @@
         children (map (fn [[k v]] (assoc v :last-seg k))
                       (sort-by key (dissoc node :ns :last-seg)))
         el (ui/fill
-            (doto (Paint.) (.setColor (unchecked-int (if (and selected-ns (= ns selected-ns))
-                                                       0xFFC0FF90
-                                                       0x00000000))))
+            (huipaint/fill (if (and selected-ns (= ns selected-ns))
+                             0xFFC0FF90
+                             0x00000000))
             (cuilay/padding
              2 5
              (ui/label string font-ui (cond-> fill-text
@@ -65,8 +68,8 @@
                                         (-> .makeClone (doto (.setAlpha (unchecked-int 0x90))))))))]
     (cuilay/column
      (if ns
-       (ui/clickable
-        #(reset! *selected-ns ns)
+       (cui/clickable
+        (uievt/on-primary-down (fn [_](reset! *selected-ns ns)))
         el)
        el)
      (when children
@@ -82,11 +85,11 @@
     (ui/dynamic ctx [font-ui (:font-ui ctx)
                      fill-text (:fill-text ctx)
                      selected-ns @*selected-ns]
-                (ui/column
+                (cuilay/column
                  (map (fn [[root-ns-seg node]]
                         (ns-list-item {:selected-ns selected-ns :font-ui font-ui :fill-text fill-text} (assoc node :last-seg root-ns-seg)))
                       (sort-by key (ns-tree-map)))
-                 #_(ui/padding
+                 #_(cuilay/padding
                     20 20
                     (text-editor/element editor))
                  (ui/gap 0 30))))))
@@ -101,8 +104,8 @@
                 (cuilay/column
                  (for [avar (when selected-ns
                               (sort-by (comp name symbol) (vals (ns-interns selected-ns))))]
-                   (ui/clickable
-                    (fn [] (reset! *selected-member avar))
+                   (cui/clickable
+                    (uievt/on-primary-down (fn [_] (reset! *selected-member avar)))
                     (ui/fill
                      (doto (Paint.) (.setColor (unchecked-int (if (= avar selected-member)
                                                                 0xFFC0FF90
@@ -110,7 +113,7 @@
                      (cuilay/padding
                       2 5
                       (ui/label (name (symbol avar)) font-ui fill-text)))))
-                 #_(ui/padding
+                 #_(cuilay/padding
                     20 20
                     (text-editor/element editor))
                  (ui/gap 0 30))))))
@@ -133,7 +136,7 @@
       (ui/gap 0 0)))))
 
 (defn basic-view []
-  (ui/row
+  (cuilay/row
    [:stretch 1 (ns-list-view)]
    [:stretch 1 (ns-interns-view)]
    [:stretch 2 (editor-view)]))
