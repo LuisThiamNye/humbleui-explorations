@@ -1,6 +1,6 @@
-# Here is some Code
+# Experiments with HumbleUI
 
-A snapshot of code as I experiment with various things. Unpolished. Enter if you dare.
+A soup of unpolished code as I explore Clojure's potential to create dynamic and humane computing experiences.
 
 Usage: `clj -M:dev`
 
@@ -12,9 +12,10 @@ Info:
 
 Contents:
 
-- Basic text input
 - Dependency graph viewer
-- Basic file browser with delete function
+- Error boundaries that show an image of the canvas before the error.
+- Stacktrace viewer where you can expand the frames to see the source of the relevant var and the line of the call site
+- Basic text input
 - Basic vim-like editor -- to be done better
 - Clojure var browser
-- Stacktrace viewer where you can expand the frames to see the source of the relevant var and the line of the call site
+- Basic file browser with delete function
