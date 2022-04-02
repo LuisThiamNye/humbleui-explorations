@@ -167,13 +167,13 @@
 (defn file-tree-toolbar []
   (cuilay/column
    (cuilay/row
-    (ui/clickable
-     (fn [] (reset! *directory-items (fs/list-dir @*directory)))
+    (cui/clickable
+     (uievt/on-primary-down (fn [_] (reset! *directory-items (fs/list-dir @*directory))))
      (cuilay/padding
       4 4 (cuilay/height
            18 (cuilay/width 18 (ui.svg/make (maticons/svg-data "refresh" "round" "24px"))))))
-    (ui/clickable
-     (fn [])
+    (cui/clickable
+     (fn [_])
      (cuilay/padding
       4 4 (cuilay/height
            18 (cuilay/width 18 (ui.svg/make (maticons/svg-data "add" "round" "24px"))))))
