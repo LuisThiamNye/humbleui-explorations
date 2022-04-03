@@ -195,8 +195,8 @@
 
 (defn node-view [{:keys [*draw-state *state]} id]
   (ui/dynamic
-    ctx [{:keys [radius]} @*state
-         {:keys [scale]} ctx]
+   ctx [{:keys [radius]} @*state
+        {:keys [scale]} ctx]
    (let [ui-node (cui/clickable
                   (fn [event]
                     (when (and (:hui.event.mouse-button/is-pressed event)
@@ -255,8 +255,8 @@
 
 (defn particle-graph* [{:keys [*state *draw-state] :as model}]
   (ui/dynamic
-    ctx [{:keys [scale]} ctx]
-    (cui/clickable
+   ctx [{:keys [scale]} ctx]
+   (cui/clickable
     (fn [event]
       (when (and (not (:hui.event.mouse-button/is-pressed event))
                  (seq (:dragging-nodes @*state)))
@@ -276,61 +276,61 @@
                                           (hui/clamp (:y p) 0 height)))))
                     ds ids)))))
      (ui/dynamic
-       _ [{:keys [nodes radius]} @*state]
-       (cui/on-draw
-        (fn [ctx _ _]
-          (some-> (:timeout @*draw-state) future-cancel)
-          (vswap! *draw-state assoc :timeout
-                  (enc/after-timeout 14
-                                     (try (particle-graph-do-physics nodes *state *draw-state)
-                                          (catch Exception e
-                                            (println (str "at: " (java.util.Date.)))
-                                            (prn e)))
-                                     (windows/request-frame (:chic/current-window ctx)))))
-        (ui/with-bounds
-          :container-bounds
-          (cui/on-draw
-           (fn [{:keys [scale]} {:keys [width height]} _canvas]
-             (let [new-size (IPoint. (- (/ width scale) (* 2 radius))
-                                     (- (/ height scale) (* 2 radius)))]
-               (when (not= (:container-size @*state) new-size)
-                 (let [new-width (:width new-size)
-                       new-height (:height new-size)]
-                   (vswap! *draw-state
-                           (fn [ds]
-                             (assoc ds :nodes
-                                    (let [vnodes (:nodes ds)
-                                          t (transient vnodes)]
-                                      (doseq [[id vnode] vnodes]
-                                        (assoc! t id
-                                                (update vnode :position
-                                                        (fn [p]
-                                                          (Point. (hui/clamp (:x p) 0 new-width)
-                                                                  (hui/clamp (:y p) 0 new-height))))))
-                                      (persistent! t)))))))
-               (swap! *state assoc :container-size new-size)))
-           (cuilay/stack
-            (cuilay/padding
-             radius
-             (cuilay/stack
-              (eduction
-               (map
-                (fn [[id {:keys [connected-nodes]}]]
-                  (eduction
-                   (map
-                    (fn [connected-id]
-                      (edge-view model id connected-nodes connected-id)))
-                   connected-nodes)))
-               nodes)))
-            (eduction (map (fn [id]
-                             (when-not (contains? (:nodes @*draw-state) id)
-                               (vswap! *draw-state assoc-in [:nodes id]
-                                       {:velocity (Point. 0 0)
-                                        :position (Point. 0 0)}))
-                             (node-view model id)))
-                      (keys nodes))
-            (eduction (map (fn [id] (annotation-view model id)))
-                      (keys nodes)))))))))))
+      _ [{:keys [nodes radius]} @*state]
+      (cui/on-draw
+       (fn [ctx _ _]
+         (some-> (:timeout @*draw-state) future-cancel)
+         (vswap! *draw-state assoc :timeout
+                 (future
+                   (try (particle-graph-do-physics nodes *state *draw-state)
+                        (catch Exception e
+                          (println (str "at: " (java.util.Date.)))
+                          (prn e)))))
+         (windows/request-frame (:chic/current-window ctx)))
+       (ui/with-bounds
+         :container-bounds
+         (cui/on-draw
+          (fn [{:keys [scale]} {:keys [width height]} _canvas]
+            (let [new-size (IPoint. (- (/ width scale) (* 2 radius))
+                                    (- (/ height scale) (* 2 radius)))]
+              (when (not= (:container-size @*state) new-size)
+                (let [new-width (:width new-size)
+                      new-height (:height new-size)]
+                  (vswap! *draw-state
+                          (fn [ds]
+                            (assoc ds :nodes
+                                   (let [vnodes (:nodes ds)
+                                         t (transient vnodes)]
+                                     (doseq [[id vnode] vnodes]
+                                       (assoc! t id
+                                               (update vnode :position
+                                                       (fn [p]
+                                                         (Point. (hui/clamp (:x p) 0 new-width)
+                                                                 (hui/clamp (:y p) 0 new-height))))))
+                                     (persistent! t)))))))
+              (swap! *state assoc :container-size new-size)))
+          (cuilay/stack
+           (cuilay/padding
+            radius
+            (cuilay/stack
+             (eduction
+              (map
+               (fn [[id {:keys [connected-nodes]}]]
+                 (eduction
+                  (map
+                   (fn [connected-id]
+                     (edge-view model id connected-nodes connected-id)))
+                  connected-nodes)))
+              nodes)))
+           (eduction (map (fn [id]
+                            (when-not (contains? (:nodes @*draw-state) id)
+                              (vswap! *draw-state assoc-in [:nodes id]
+                                      {:velocity (Point. 0 0)
+                                       :position (Point. 0 0)}))
+                            (node-view model id)))
+                     (keys nodes))
+           (eduction (map (fn [id] (annotation-view model id)))
+                     (keys nodes)))))))))))
 
 (defn slider [*vstate {:keys [value on-change]}]
   (let [cursor-width 12
@@ -369,7 +369,7 @@
                       (vswap! *vstate assoc :dragging? true
                               :mouse-offset
                               (- (/ (:x (cui/component-relative-pos
-                                       event (:chic.ui/mouse-win-pos event))) scale)))))
+                                         event (:chic.ui/mouse-win-pos event))) scale)))))
                   (cuilay/width
                    cursor-width
                    (cuilay/height

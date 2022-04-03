@@ -88,7 +88,7 @@
            [:stretch 1
             (ui/gap 0 0)]
            (ui/contextual
-            (fn [_]
+            (fn [{:keys [:chic.profiling/time-since-last-paint]}]
               (let [{:keys [latest-paint-duration]} @(:*profiling window)
                     millis (/ latest-paint-duration 1000000.)]
                 (ui/fill
@@ -98,7 +98,7 @@
                  (cuilay/padding
                   5 0(cuilay/valign
                       0.5 (ui/label (format "%d fps %6.3f ms"
-                                            (unchecked-int (/ 1000 millis)) millis) font-code fill-text)))))))
+                                            (unchecked-int (/ 1000000000 time-since-last-paint)) millis) font-code fill-text)))))))
            (cui/clickable
             (fn [event]
               (when (:hui.event.mouse-button/is-pressed event)

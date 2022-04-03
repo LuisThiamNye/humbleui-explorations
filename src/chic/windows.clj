@@ -147,6 +147,8 @@
   (let [bounds (window-app-rect window-obj)
         ctx (assoc @*ctx :scale (huiwin/scale window-obj)
                    :chic/current-window w
+                   :chic.profiling/time-since-last-paint
+                   (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w) 0))
                    :chic.ui/component-rect bounds
                    :chic.ui/window-content-bounds bounds
                    :chic.error/make-render-error-window make-render-error-window)]
@@ -166,6 +168,7 @@
             (ui/draw @*app-root ctx bounds canvas))))
     (vswap! (:*profiling w) assoc :latest-paint-duration
             (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w))))
+    #_(request-frame w)
     #_(let [{:keys [paint-start-time event-triggers-change-time paint-done-time]} @(:*profiling w)]
         (chic.debug/println-main
          "(ms)"
