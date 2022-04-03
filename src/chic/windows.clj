@@ -151,7 +151,7 @@
                    :chic.ui/window-content-bounds bounds
                    :chic.error/make-render-error-window make-render-error-window)]
     (profile/reset)
-    #_(vswap! (:*profiling w) assoc :paint-start-time (System/nanoTime))
+    (vswap! (:*profiling w) assoc :paint-start-time (System/nanoTime))
     (profile/measure
      "frame"
      (try (ui/draw @*app-root ctx bounds canvas)
@@ -164,7 +164,8 @@
             (.clear canvas (unchecked-int 0xFFF6F6F6))
             (vreset! *app-root (cui/dyncomp (error-view)))
             (ui/draw @*app-root ctx bounds canvas))))
-    #_(vswap! (:*profiling w) assoc :paint-done-time (System/nanoTime))
+    (vswap! (:*profiling w) assoc :latest-paint-duration
+            (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w))))
     #_(let [{:keys [paint-start-time event-triggers-change-time paint-done-time]} @(:*profiling w)]
         (chic.debug/println-main
          "(ms)"

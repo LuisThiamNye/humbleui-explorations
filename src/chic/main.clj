@@ -8,6 +8,7 @@
    [rebel-readline.clojure.main]
    [clojure.main]
    [chic.style :as style]
+   [io.github.humbleui.paint :as huipaint]
    [chic.ui :as cui]
    [chic.demo :as demo]
    [chic.ui.layout :as cuilay]
@@ -63,10 +64,11 @@
         window (:chic/current-window ctx)]
    (let [font-ui (Font. style/face-default (float (* 14 scale)))
          leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
-         fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
+         fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))
+         font-code (Font. style/face-code-default (float (* 14 scale)))]
      (ui/with-context {:face-ui style/face-default
                        :face-code style/face-code-default
-                       :font-code (Font. style/face-code-default (float (* 14 scale)))
+                       :font-code font-code
                        :font-ui font-ui
                        :focus-manager focus-manager
                        :leading leading
@@ -85,11 +87,23 @@
            key-indicator
            [:stretch 1
             (ui/gap 0 0)]
+           (ui/contextual
+            (fn [_]
+              (let [{:keys [latest-paint-duration]} @(:*profiling window)
+                    millis (/ latest-paint-duration 1000000.)]
+                (ui/fill
+                 (huipaint/fill (if (< 16000000 latest-paint-duration)
+                                  0xFFFF0000
+                                  0x00FFFFFF))
+                 (cuilay/padding
+                  5 0(cuilay/valign
+                      0.5 (ui/label (format "%d fps %6.3f ms"
+                                            (unchecked-int (/ 1000 millis)) millis) font-code fill-text)))))))
            (cui/clickable
             (fn [event]
               (when (:hui.event.mouse-button/is-pressed event)
                 (windows/remount-window window)))
-            (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
+            (ui/fill (huipaint/fill 0x11000000)
                      (cuilay/valign
                       0.5 (cuilay/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
 
