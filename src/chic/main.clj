@@ -100,7 +100,7 @@
         height (* 400 scale)
         area (:work-area screen)
         x (:x area)
-        y (-> (:height area) (- height) (/ 2) (+ (:y area)))]
+        y (-> (:height area) (- height))]
     (doto
      (windows/make
       {:id "main"

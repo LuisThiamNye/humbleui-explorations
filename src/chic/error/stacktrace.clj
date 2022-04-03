@@ -50,8 +50,8 @@
 
 (defn stack-trace-segment-view [frames]
   (ui/dynamic
-    ctx [{:keys [font-ui fill-text]} ctx]
-    (let [file-col-width 110
+   ctx [{:keys [font-ui fill-text]} ctx]
+   (let [file-col-width 110
          text-vpadding 3
          file-label (fn [filename]
                       (cuilay/width
@@ -71,7 +71,7 @@
                                  (cuilay/padding
                                   0 text-vpadding (ui/label (str n) font-ui fill-text))
                                  (ui/gap 8 0))))))
-          ns-foreign-fill (huipaint/fill 0x80000000)
+         ns-foreign-fill (huipaint/fill 0x80000000)
          ns-fill (doto (Paint.) (.setColor (unchecked-int 0xC0003040)))
          ns-label (fn [clsname]
                     (ui/label clsname font-ui (if (str/starts-with? clsname "chic")
@@ -162,11 +162,11 @@
           (seq children)))))))
 
 #_(defn repeated-leading-items [items]
-  (loop [init-stack [(first items)]
-         repeat-stack []
-         i 1]
-    (when-let [item (nth items i nil)]
-      (if (= init-stack repeat-stack)
+    (loop [init-stack [(first items)]
+           repeat-stack []
+           i 1]
+      (when-let [item (nth items i nil)]
+        (if (= init-stack repeat-stack)
           init-stack
           (if (= item (nth init-stack (count repeat-stack)))
             (recur init-stack
@@ -205,7 +205,7 @@
           remainder (transient [])
           *done? (volatile! false)]
       (fn
-       ([] (rf))
+        ([] (rf))
         ([acc]
          (let [remainder (persistent! remainder)
                acc (if (.isEmpty stack)
@@ -240,33 +240,33 @@
                         :line-number (.getLineNumber frame)
                         :native-method? (.isNativeMethod frame)}))
                 (.getStackTrace throwable))]
-    (ui/with-context
-      {:font-ui (Font. style/face-code-default (float 12))
-       :fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))}
-      (if (instance? java.lang.StackOverflowError throwable)
-       (let [frames (vec frames)]
-         (if-let [{:keys [segment start-idx end-idx]} (repeated-items-info frames)]
-           (let [[nrepeats remainder]
-                 (reduce (fn [acc x]
-                           [(inc (nth acc 0)) x])
-                         [-1 []] ;; last element is non-repeated frames
-                         (eduction (partition-leading-repeats segment)
-                                   (subvec frames (inc end-idx))))]
-             (ui/dynamic
-               ctx [{:keys [font-ui fill-text]} ctx]
-               (cuilay/column
-                (stack-trace-segment-view (subvec frames 0 start-idx))
-                (cuilay/padding
-                 8 (ui/label (str "Repeated segment:") font-ui fill-text))
-                (stack-trace-segment-view segment)
-                (cuilay/padding
-                 8 (ui/label (str "Seen again " nrepeats " times") font-ui fill-text))
-                (stack-trace-segment-view remainder))))
-           (stack-trace-segment-view frames)))
-       (stack-trace-segment-view frames)))))
+    (ui/dynamic
+     ctx [{:keys [scale]} ctx]
+     (ui/with-context
+       {:font-ui (Font. style/face-code-default (float (* scale 12)))}
+       (if (instance? java.lang.StackOverflowError throwable)
+         (let [frames (vec frames)]
+           (if-let [{:keys [segment start-idx end-idx]} (repeated-items-info frames)]
+             (let [[nrepeats remainder]
+                   (reduce (fn [acc x]
+                             [(inc (nth acc 0)) x])
+                           [-1 []] ;; last element is non-repeated frames
+                           (eduction (partition-leading-repeats segment)
+                                     (subvec frames (inc end-idx))))]
+               (ui/dynamic
+                ctx [{:keys [font-ui fill-text]} ctx]
+                (cuilay/column
+                 (stack-trace-segment-view (subvec frames 0 start-idx))
+                 (cuilay/padding
+                  8 (ui/label (str "Repeated segment:") font-ui fill-text))
+                 (stack-trace-segment-view segment)
+                 (cuilay/padding
+                  8 (ui/label (str "Seen again " nrepeats " times") font-ui fill-text))
+                 (stack-trace-segment-view remainder))))
+             (stack-trace-segment-view frames)))
+         (stack-trace-segment-view frames))))))
 
 (comment
-
 
   (:start-idx (repeated-items-info --fs))
   (:end-idx (repeated-items-info --fs))

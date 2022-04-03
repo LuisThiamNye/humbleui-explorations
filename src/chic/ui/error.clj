@@ -16,60 +16,65 @@
    [java.lang AutoCloseable]))
 
 (defn boundary-error-view* [{:keys [throwable] :as info}]
-  (let [font-ui (Font. style/face-default (float 10))
-        fill-text (huipaint/fill 0xFF000000)]
-    (ui/dynamic
-      ctx [eb (:error-boundary ctx)]
-      (ui/fill
-      (huipaint/fill 0xFFFFD0D0)
-      (ui/clip
-       (cuilay/column
+  (ui/dynamic
+    ctx [{:keys [scale fill-text]} ctx]
+    (when fill-text
+      (ui/with-context
+       {:font-ui (Font. style/face-default (float (* scale 10)))}
         (ui/dynamic
-          ctx [make-render-error-window (:chic.error/make-render-error-window ctx)]
-          (cui/clickable
-           (fn [event]
-             (when (:hui.event.mouse-button/is-pressed event)
-               (make-render-error-window (assoc info :error-boundary eb))))
-           (ui/dynamic
-             ctx [{:hui/keys [hovered?]} ctx]
-             (ui/fill
-              (huipaint/fill (if hovered? 0x11000000 0x00000000))
-              (cuilay/row
-               (cuilay/padding
-                1
-                (cuilay/height
-                 14 (cuilay/width #(:height %)
-                                  (ui.svg/make (maticons/svg-data "open_in_new" "filled" "24px")))))
-               [:stretch 1
-                (cuilay/valign
-                 0.5 (cuilay/padding
-                      2 4 (cuilay/halign
-                           0.5 (ui/label (str throwable) font-ui fill-text))))])))))
-        (ui/fill (huipaint/fill 0x30000000)
-                 (ui/gap 0 1))
-        (cui/clickable
-         (fn [event]
-           (when (:hui.event.mouse-button/is-pressed event)
-             (error/reset-error-boundary eb)))
-         (ui/dynamic
-           ctx [{:hui/keys [hovered?]} ctx]
-           (ui/fill
-            (huipaint/fill (if hovered? 0x11000000 0x00000000))
-            (cuilay/row
-             (cuilay/padding
-              1 (cuilay/height
-                 14 (cuilay/width #(:height %)
-                                  (ui.svg/make (maticons/svg-data "refresh" "filled" "24px")))))
-             [:stretch 1
-              (cuilay/halign
-               0.5 (cuilay/padding 2 4 (ui/label "Reload boundary" font-ui fill-text)))]))))
-        (ui/fill (huipaint/fill 0x30000000)
-                 (ui/gap 0 1))
-        (when-not (instance? java.lang.StackOverflowError throwable)
-          (for [sfe (.getStackTrace ^Throwable throwable)]
-            (cuilay/padding
-             0 3
-             (ui/label (pr-str sfe) font-ui fill-text))))))))))
+          ctx [{:keys [font-ui]
+                eb :error-boundary} ctx]
+          (when font-ui
+            (ui/fill
+            (huipaint/fill 0xFFFFD0D0)
+            (ui/clip
+             (cuilay/column
+              (ui/dynamic
+                ctx [make-render-error-window (:chic.error/make-render-error-window ctx)]
+                (cui/clickable
+                 (fn [event]
+                   (when (:hui.event.mouse-button/is-pressed event)
+                     (make-render-error-window (assoc info :error-boundary eb))))
+                 (ui/dynamic
+                   ctx [{:hui/keys [hovered?]} ctx]
+                   (ui/fill
+                    (huipaint/fill (if hovered? 0x11000000 0x00000000))
+                    (cuilay/row
+                     (cuilay/padding
+                      1
+                      (cuilay/height
+                       14 (cuilay/width #(:height %)
+                                        (ui.svg/make (maticons/svg-data "open_in_new" "filled" "24px")))))
+                     [:stretch 1
+                      (cuilay/valign
+                       0.5 (cuilay/padding
+                            2 4 (cuilay/halign
+                                 0.5 (ui/label (str throwable) font-ui fill-text))))])))))
+              (ui/fill (huipaint/fill 0x30000000)
+                       (ui/gap 0 1))
+              (cui/clickable
+               (fn [event]
+                 (when (:hui.event.mouse-button/is-pressed event)
+                   (error/reset-error-boundary eb)))
+               (ui/dynamic
+                 ctx [{:hui/keys [hovered?]} ctx]
+                 (ui/fill
+                  (huipaint/fill (if hovered? 0x11000000 0x00000000))
+                  (cuilay/row
+                   (cuilay/padding
+                    1 (cuilay/height
+                       14 (cuilay/width #(:height %)
+                                        (ui.svg/make (maticons/svg-data "refresh" "filled" "24px")))))
+                   [:stretch 1
+                    (cuilay/halign
+                     0.5 (cuilay/padding 2 4 (ui/label "Reload boundary" font-ui fill-text)))]))))
+              (ui/fill (huipaint/fill 0x30000000)
+                       (ui/gap 0 1))
+              (when-not (instance? java.lang.StackOverflowError throwable)
+                (for [sfe (.getStackTrace ^Throwable throwable)]
+                  (cuilay/padding
+                   0 3
+                   (ui/label (pr-str sfe) font-ui fill-text)))))))))))))
 
 (defn boundary-error-view [info]
   (cui/dyncomp (boundary-error-view* info)))

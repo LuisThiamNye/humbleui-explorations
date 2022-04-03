@@ -17,6 +17,7 @@
 
 (defn vadd [a b] (Point. (unchecked-add (:x a) (:x b)) (unchecked-add (:y a) (:y b))))
 (defn vsub [a b] (Point. (unchecked-subtract (:x a) (:x b)) (unchecked-subtract (:y a) (:y b))))
+(defn vscale [s v] (Point. (unchecked-multiply s (:x v)) (unchecked-multiply s (:y v))))
 
 (let [disp -40]
   (cond
@@ -28,8 +29,7 @@
     (* 2 50)))
 
 (defn particle-graph-do-physics [nodes *state *draw-state]
-  (let [vscale (fn [s v] (Point. (unchecked-multiply s (:x v)) (unchecked-multiply s (:y v))))
-        vdot (fn [a b] (unchecked-add (unchecked-multiply (:x a) (:x b)) (unchecked-multiply (:y a) (:y b))))
+  (let [vdot (fn [a b] (unchecked-add (unchecked-multiply (:x a) (:x b)) (unchecked-multiply (:y a) (:y b))))
         vabs (fn [v] (math/sqrt (vdot v v)))
         {:keys [container-size]
          {:keys [time-scale attraction-coeff friction-coeff
@@ -179,21 +179,24 @@
                                  (unchecked-int 0xD0ff9900)]))]
      (ui/dynamic
       _ [vnodes (:nodes @*draw-state)]
-       (let [pos1 (:position (get vnodes id))
-             pos2 (:position (get vnodes connected-id))
-             stroke (.setShader
-                     stroke (Shader/makeLinearGradient
-                             (float (:x pos1)) (float (:y pos1))
-                             (float (:x pos2)) (float (:y pos2))
-                             colours))]
-         (cui/on-draw
-          (fn [_ _cs ^Canvas canvas]
-            (.drawLine canvas (:x pos1) (:y pos1) (:x pos2) (:y pos2) stroke))
-          (ui/gap 0 0)))))))
+      (let [pos1 (:position (get vnodes id))
+            pos2 (:position (get vnodes connected-id))
+            stroke (.setShader
+                    stroke (Shader/makeLinearGradient
+                            (float (:x pos1)) (float (:y pos1))
+                            (float (:x pos2)) (float (:y pos2))
+                            colours))]
+        (cui/on-draw
+         (fn [{:keys [scale]} _cs ^Canvas canvas]
+           (.drawLine canvas
+                      (* scale (:x pos1)) (* scale (:y pos1))
+                      (* scale (:x pos2)) (* scale (:y pos2)) stroke))
+         (ui/gap 0 0)))))))
 
 (defn node-view [{:keys [*draw-state *state]} id]
   (ui/dynamic
-   ctx [{:keys [radius]} @*state]
+    ctx [{:keys [radius]} @*state
+         {:keys [scale]} ctx]
    (let [ui-node (cui/clickable
                   (fn [event]
                     (when (and (:hui.event.mouse-button/is-pressed event)
@@ -202,7 +205,7 @@
                                       (-> state
                                           (assoc :dragging-nodes #{id})
                                           (assoc :mouse-drag-offset (vsub (get-in @*draw-state [:nodes id :position])
-                                                                          (:chic.ui/mouse-win-pos event))))))
+                                                                          (vscale (/ scale) (:chic.ui/mouse-win-pos event)))))))
                       (vswap! *draw-state (fn [ds]
                                             (update-in ds [:nodes id] assoc :velocity (Point. 0 0))))))
                   (oval-shape (huipaint/fill 0xFF5077ff #_0xFF10b0b0)))]
@@ -215,10 +218,10 @@
              (ui/dynamic
               ctx [{{:keys [x y]} :position} (get (:nodes @*draw-state) id)
                    {:keys [container-bounds]} ctx]
-               (cuilay/translate
-                (hui/clamp x 0 (- (:width container-bounds) (* 2 radius)))
-                (hui/clamp y 0 (- (:height container-bounds) (* 2 radius)))
-                ui-node)))))))))
+              (cuilay/translate
+               (hui/clamp x 0 (- (:width container-bounds) (* 2 radius)))
+               (hui/clamp y 0 (- (:height container-bounds) (* 2 radius)))
+               ui-node)))))))))
 
 (defn annotation-view [{:keys [*draw-state *state]} id]
   (ui/dynamic
@@ -251,80 +254,83 @@
                  child)))))))))
 
 (defn particle-graph* [{:keys [*state *draw-state] :as model}]
-  (cui/clickable
-   (fn [event]
-     (when (and (not (:hui.event.mouse-button/is-pressed event))
-                (seq (:dragging-nodes @*state)))
-       (swap! *state assoc :dragging-nodes #{})))
-   (cui/on-mouse-move
+  (ui/dynamic
+    ctx [{:keys [scale]} ctx]
+    (cui/clickable
     (fn [event]
-      (when-let [ids (seq (:dragging-nodes @*state))]
-        (vswap! *draw-state
-                (fn [ds]
-                  (reduce
-                   (fn [ds id]
-                     (assoc-in ds [:nodes id :position]
-                               (let [p (vadd (:mouse-drag-offset @*state)
-                                             (:chic.ui/mouse-win-pos event))
-                                     {:keys [width height]} (:container-size @*state)]
-                                 (Point. (hui/clamp (:x p) 0 width)
-                                         (hui/clamp (:y p) 0 height)))))
-                   ds ids)))))
-    (ui/dynamic
-     _ [{:keys [nodes radius]} @*state]
-     (cui/on-draw
-      (fn [ctx _ _]
-        (some-> (:timeout @*draw-state) future-cancel)
-        (vswap! *draw-state assoc :timeout
-                (enc/after-timeout 14
-                                   (try (particle-graph-do-physics nodes *state *draw-state)
-                                        (catch Exception e
-                                          (println (str "at: " (java.util.Date.)))
-                                          (prn e)))
-                                   (windows/request-frame (:chic/current-window ctx)))))
-      (ui/with-bounds
-        :container-bounds
-        (cui/on-draw
-         (fn [_ctx {:keys [width height]} _canvas]
-           (let [new-size (IPoint. (- width (* 2 radius)) (- height (* 2 radius)))]
-             (when (not= (:container-size @*state) new-size)
-               (let [new-width (:width new-size)
-                     new-height (:height new-size)]
-                 (vswap! *draw-state
-                         (fn [ds]
-                           (assoc ds :nodes
-                                  (let [vnodes (:nodes ds)
-                                        t (transient vnodes)]
-                                    (doseq [[id vnode] vnodes]
-                                      (assoc! t id
-                                              (update vnode :position
-                                                      (fn [p]
-                                                        (Point. (hui/clamp (:x p) 0 new-width)
-                                                                (hui/clamp (:y p) 0 new-height))))))
-                                    (persistent! t)))))))
-             (swap! *state assoc :container-size new-size)))
-         (cuilay/stack
-          (cuilay/padding
-           radius
+      (when (and (not (:hui.event.mouse-button/is-pressed event))
+                 (seq (:dragging-nodes @*state)))
+        (swap! *state assoc :dragging-nodes #{})))
+    (cui/on-mouse-move
+     (fn [event]
+       (when-let [ids (seq (:dragging-nodes @*state))]
+         (vswap! *draw-state
+                 (fn [ds]
+                   (reduce
+                    (fn [ds id]
+                      (assoc-in ds [:nodes id :position]
+                                (let [p (vadd (:mouse-drag-offset @*state)
+                                              (vscale (/ scale) (:chic.ui/mouse-win-pos event)))
+                                      {:keys [width height]} (:container-size @*state)]
+                                  (Point. (hui/clamp (:x p) 0 width)
+                                          (hui/clamp (:y p) 0 height)))))
+                    ds ids)))))
+     (ui/dynamic
+       _ [{:keys [nodes radius]} @*state]
+       (cui/on-draw
+        (fn [ctx _ _]
+          (some-> (:timeout @*draw-state) future-cancel)
+          (vswap! *draw-state assoc :timeout
+                  (enc/after-timeout 14
+                                     (try (particle-graph-do-physics nodes *state *draw-state)
+                                          (catch Exception e
+                                            (println (str "at: " (java.util.Date.)))
+                                            (prn e)))
+                                     (windows/request-frame (:chic/current-window ctx)))))
+        (ui/with-bounds
+          :container-bounds
+          (cui/on-draw
+           (fn [{:keys [scale]} {:keys [width height]} _canvas]
+             (let [new-size (IPoint. (- (/ width scale) (* 2 radius))
+                                     (- (/ height scale) (* 2 radius)))]
+               (when (not= (:container-size @*state) new-size)
+                 (let [new-width (:width new-size)
+                       new-height (:height new-size)]
+                   (vswap! *draw-state
+                           (fn [ds]
+                             (assoc ds :nodes
+                                    (let [vnodes (:nodes ds)
+                                          t (transient vnodes)]
+                                      (doseq [[id vnode] vnodes]
+                                        (assoc! t id
+                                                (update vnode :position
+                                                        (fn [p]
+                                                          (Point. (hui/clamp (:x p) 0 new-width)
+                                                                  (hui/clamp (:y p) 0 new-height))))))
+                                      (persistent! t)))))))
+               (swap! *state assoc :container-size new-size)))
            (cuilay/stack
-            (eduction
-             (map
-              (fn [[id {:keys [connected-nodes]}]]
-                (eduction
-                 (map
-                  (fn [connected-id]
-                    (edge-view model id connected-nodes connected-id)))
-                 connected-nodes)))
-             nodes)))
-          (eduction (map (fn [id]
-                           (when-not (contains? (:nodes @*draw-state) id)
-                             (vswap! *draw-state assoc-in [:nodes id]
-                                     {:velocity (Point. 0 0)
-                                      :position (Point. 0 0)}))
-                           (node-view model id)))
-                    (keys nodes))
-          (eduction (map (fn [id] (annotation-view model id)))
-                    (keys nodes))))))))))
+            (cuilay/padding
+             radius
+             (cuilay/stack
+              (eduction
+               (map
+                (fn [[id {:keys [connected-nodes]}]]
+                  (eduction
+                   (map
+                    (fn [connected-id]
+                      (edge-view model id connected-nodes connected-id)))
+                   connected-nodes)))
+               nodes)))
+            (eduction (map (fn [id]
+                             (when-not (contains? (:nodes @*draw-state) id)
+                               (vswap! *draw-state assoc-in [:nodes id]
+                                       {:velocity (Point. 0 0)
+                                        :position (Point. 0 0)}))
+                             (node-view model id)))
+                      (keys nodes))
+            (eduction (map (fn [id] (annotation-view model id)))
+                      (keys nodes)))))))))))
 
 (defn slider [*vstate {:keys [value on-change]}]
   (let [cursor-width 12
@@ -341,17 +347,19 @@
        (cuilay/valign
         0.5 (ui/fill (Paint.) (ui/gap 0 3)))
        (cuilay/valign
-        0.5 (cuilay/size-dependent
-             (fn [cs]
+        0.5 (ui/with-bounds
+              :slider-bounds
+              (ui/dynamic
+               ctx [{:keys [slider-bounds scale]} ctx]
                (cui/on-mouse-move
                 (fn [event]
                   (when (:dragging? @*vstate)
-                    (let [new-pos (:x (cui/component-relative-pos event (:chic.ui/mouse-win-pos event)))
+                    (let [new-pos (/ (:x (cui/component-relative-pos event (:chic.ui/mouse-win-pos event))) scale)
                           ;; diff (/ (- new-pos (:last-mouse-pos @*vstate)) (:width cs))
                           ]
                       ;; (vswap! *vstate assoc :last-mouse-pos new-pos)
                       (on-change (hui/clamp (/ (+ new-pos (:mouse-offset @*vstate))
-                                               (- (:width cs) cursor-width)) 0 1)))))
+                                               (- (:width slider-bounds) cursor-width)) 0 1)))))
                 (cuilay/halign
                  value
                  (cui/clickable
@@ -360,8 +368,8 @@
                                (:hui.event.mouse-button/is-pressed event))
                       (vswap! *vstate assoc :dragging? true
                               :mouse-offset
-                              (- (:x (cui/component-relative-pos
-                                      event (:chic.ui/mouse-win-pos event)))))))
+                              (- (/ (:x (cui/component-relative-pos
+                                       event (:chic.ui/mouse-win-pos event))) scale)))))
                   (cuilay/width
                    cursor-width
                    (cuilay/height

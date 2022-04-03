@@ -459,8 +459,7 @@
     ui (focusable/make
         {:focus-node focus-node}
         (ui/dynamic
-         ctx [font-ui (:font-ui ctx)
-              {:keys [fill-text focus-manager]
+         ctx [{:keys [fill-text focus-manager font-ui scale]
                window :chic/current-window} ctx]
          (let [ctx {:focus-manager focus-manager
                     :chic/current-window window}]
@@ -475,7 +474,7 @@
                                                  (cui.text/text-line (:content state) font-ui)))
                      textwidth (.getWidth textline)
                      right-padding 2
-                     linewidth (Math/ceil (+ left-padding #_label-subpixel-offset textwidth right-padding))
+                     linewidth (Math/ceil (+ left-padding label-subpixel-offset textwidth right-padding))
                      ctx (assoc ctx :linewidth linewidth)]
                  (cui/clickable
                   (fn [event]
@@ -486,7 +485,7 @@
                         (click-text-init model event))))
                   (cuilay/size-dependent
                    (fn [cs]
-                     (let [excess (min (unchecked-subtract (:width cs) linewidth) 0)]
+                     (let [excess (min (unchecked-subtract (Math/floorDiv (:width cs) scale) linewidth) 0)]
                        (cuilay/scrollable
                         (fn [event]
                           (vswap! *draw-state update :offset
@@ -496,7 +495,7 @@
                         (ui/dynamic
                           _ [{:keys [selection-idx cursor-idx prev-cursor-idx]} @*state]
                           (let [idx->x (fn [idx]
-                                         (+ left-padding (math/round (.getCoordAtOffset textline idx))))
+                                         (+ left-padding (math/round (/ (.getCoordAtOffset textline idx) scale))))
                                 cursor-width 1
                                 cursor-x (idx->x cursor-idx)
                                 select-x (when selection-idx (idx->x selection-idx))
@@ -506,7 +505,7 @@
                                   (cuilay/padding
                                    0 4
                                    (cui.subpixel/row
-                                    (cui.subpixel/gap (+ left-padding #_label-subpixel-offset) 0)
+                                    (cui.subpixel/gap (+ left-padding label-subpixel-offset) 0)
                                     (cui.subpixel/label-from-textline textline (:content state) font-ui fill-text)
                                     (cui.subpixel/gap right-padding 0)))
                                   ;; CURSOR
@@ -542,11 +541,13 @@
                                        [:stretch 1 (ui/gap 0 0)])))))]
                             (cui/on-draw
                              (fn [_ cs _]
+                               ;; Make sure cursor is in view
                                (when-not (= cursor-idx prev-cursor-idx)
                                  (swap! *state assoc :prev-cursor-idx cursor-idx)
                                  (vswap! *draw-state update :offset
                                          (fn [offset]
-                                           (hui/clamp offset (- left-padding cursor-x) (min 0 (- (:width cs) cursor-x right-padding)))))))
+                                           (hui/clamp offset (- left-padding cursor-x)
+                                                      (min 0 (- (Math/floorDiv (:width cs) scale) cursor-x right-padding)))))))
                              (ui/dynamic
                                _ [offset (:offset @*draw-state)]
                                (cuilay/overflow-x offset inner-ui)))))))))))))))))]

@@ -453,22 +453,22 @@
 (deftype+ OverflowX [child target-offset ^:mut offset ^:mut child-rect]
   IComponent
   (-measure [_ ctx cs]
-            (let [child-cs (cui/unbounded-right cs)]
-              (set! child-rect (cui/rect-with-wh cs (measure-child child ctx (cui/offset-lt child-cs target-offset 0))))
+            (let [child-cs (cui/unbounded-right cs)
+                  target-offset (ui/dimension target-offset cs ctx)]
+              (set! child-rect (cui/rect-with-wh cs (measure-child child ctx (cui/rect-translate child-cs target-offset 0))))
               (set! offset (hui/clamp target-offset (- (:width cs) (:width child-rect)) 0))
               (IPoint. (:width cs) (:height child-rect))))
 
   (-draw [_ ctx cs ^Canvas canvas]
          (let [child-size (measure-child child ctx (cui/unbounded-right cs))]
-           (set! child-rect (cui/rect-with-wh (cui/offset-lt cs offset 0)
+           (set! offset (hui/clamp (ui/dimension target-offset cs ctx) (- (:width cs) (:width child-size)) 0))
+           (set! child-rect (cui/rect-with-wh (cui/rect-translate cs offset 0)
                                               (:width child-size) (:height child-size))))
-         (set! offset (hui/clamp target-offset (- (:width cs) (:width child-rect)) 0))
-         (let [layer (.save canvas)
-               child-cs child-rect]
+         (let [layer (.save canvas)]
            (try
              (.clipRect canvas (Rect/makeXYWH 0 0 (:width cs) (:height cs)))
              (.translate canvas offset 0)
-             (draw-child child ctx (cui/offset-lt child-cs offset 0) canvas)
+             (draw-child child ctx child-rect canvas)
              (finally
                (.restoreToCount canvas layer)))))
 
@@ -519,21 +519,23 @@
   (cui/dyncomp
    (->Stack (persistent! (enc/into! (transient []) (remove nil?) (flatten-stack-children children))))))
 
-(deftype+ Translate [dx dy child]
+(deftype+ Translate [dx dy child ^:mut child-rect]
   IComponent
   (-measure [_ ctx cs] (cui/measure-child child ctx cs))
 
   (-draw [_ ctx cs ^Canvas canvas]
-         (let [layer (.save canvas)]
+         (let [layer (.save canvas)
+               dx (ui/dimension dx cs ctx)
+               dy (ui/dimension dy cs ctx)]
+           (set! child-rect (cui/rect-translate cs dx dy))
            (try (.translate canvas dx dy)
-                (cui/draw-child child ctx (cui/rect-translate cs dx dy) canvas)
+                (cui/draw-child child ctx child-rect canvas)
                (finally (.restoreToCount canvas layer)))))
 
-  (-event [_ event] (cui/event-propagate
-                     event child (cui/rect-translate (:chic.ui/component-rect event) dx dy)))
+  (-event [_ event] (cui/event-propagate event child child-rect))
 
   AutoCloseable
   (close [_] (ui/child-close child)))
 
 (defn translate [dx dy child]
-  (->Translate dx dy child))
+  (->Translate dx dy child nil))

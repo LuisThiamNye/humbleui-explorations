@@ -110,37 +110,42 @@
     (huiwin/request-frame (:window-obj window))))
 
 (defn error-view []
-  (let [font-ui (Font. style/face-code-default (float 13))
-        fill-text (huipaint/fill 0xFF000000)]
-    (ui/dynamic
-     ctx [{:keys [*ui-error] :as window} (:chic/current-window ctx)
-          ui-error @*ui-error]
-      (let [{:keys [throwable bitmap]} ui-error]
-        (ui/fill
-        (huipaint/fill 0xFFF6E6E6)
-        (cuilay/vscrollbar
-         (cuilay/vscroll
-          (cuilay/column
-           (cuilay/padding
-            5 5
-            (cuilay/column
-             (cui/clickable
-              (uievt/on-primary-down (fn [_] (remount-window window)))
-              (ui/fill (huipaint/fill 0x11000000)
-                       (cuilay/halign
-                        0.5 (cuilay/padding 20 5 (ui/label "Reload window" font-ui fill-text)))))
-             (cuilay/padding 5 5 (ui/label (str throwable) font-ui fill-text))
-             (cui.error/bound-errors
+  (ui/dynamic
+    ctx [{:keys [scale]} ctx]
+    (let [font-ui (Font. style/face-code-default (float (* scale 13)))
+         fill-text (huipaint/fill 0xFF000000)]
+     (ui/with-context
+       {:font-ui font-ui
+        :fill-text fill-text}
+       (ui/dynamic
+         ctx [{:keys [*ui-error] :as window} (:chic/current-window ctx)
+              ui-error @*ui-error]
+         (let [{:keys [throwable bitmap]} ui-error]
+           (ui/fill
+            (huipaint/fill 0xFFF6E6E6)
+            (cuilay/vscrollbar
+             (cuilay/vscroll
               (cuilay/column
-               (when bitmap
-                 (cui/dyncomp(error/partial-canvas-preview bitmap)))
-               (cui/dyncomp (error.stacktrace/stack-trace-view throwable))
-               (cui/dyncomp (error/full-error-view-of throwable))))))))))))))
+               (cuilay/padding
+                5 5
+                (cuilay/column
+                 (cui/clickable
+                  (uievt/on-primary-down (fn [_] (remount-window window)))
+                  (ui/fill (huipaint/fill 0x11000000)
+                           (cuilay/halign
+                            0.5 (cuilay/padding 20 5 (ui/label "Reload window" font-ui fill-text)))))
+                 (cuilay/padding 5 5 (ui/label (str throwable) font-ui fill-text))
+                 (cui.error/bound-errors
+                  (cuilay/column
+                   (when bitmap
+                     (cui/dyncomp(error/partial-canvas-preview bitmap)))
+                   (cui/dyncomp (error.stacktrace/stack-trace-view throwable))
+                   (cui/dyncomp (error/full-error-view-of throwable))))))))))))))))
 
 (defn on-paint-handler [{:keys [*app-root window-obj *ctx *ui-error] :as w} ^Canvas canvas]
   (.clear canvas (unchecked-int 0xFFF6F6F6))
   (let [bounds (window-app-rect window-obj)
-        ctx (assoc @*ctx :scale (huiwin/scale window-obj)
+        ctx (assoc @*ctx :scale (or 2 (huiwin/scale window-obj))
                    :chic/current-window w
                    :chic.ui/component-rect bounds
                    :chic.ui/window-content-bounds bounds

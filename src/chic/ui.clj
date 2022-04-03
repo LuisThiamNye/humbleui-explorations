@@ -29,7 +29,7 @@
     (print-simple (str "#Point[" (.getX o) " " (.getY o) "]") w))
 
 (defn assert-good-cs [cs]
-  #_(when (or (instance? Point cs) (instance? IPoint cs)
+  (when (or (instance? Point cs) (instance? IPoint cs)
             ;; (neg? (:right cs))
             ;; (neg? (:x cs))
             ;; (neg? (:bottom cs))

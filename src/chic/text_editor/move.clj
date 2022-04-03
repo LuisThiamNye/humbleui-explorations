@@ -8,18 +8,6 @@
    (chic.text_editor TextEditor)
    (chic.text_editor.element TextLineSegment)))
 
-#_(defn closest-idx-to-x [{:keys [face-default]} s x]
-    (let [font (Font. face-default (float 13))
-          line-length (.getWidth (TextLine/make s font))
-          guess (int (* (dec (count s)) (min 1 (/ x line-length))))]
-      guess))
-
-(comment
-  #_(closest-idx-to-x @(:state chic.main/editor) "abcde" 1000)
-
-  #!
-  )
-
 (defn move-up-or-down [sm up?]
   (reduce
    (fn [sm {:keys [idx i line-id] :as cursor}]
