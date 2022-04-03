@@ -58,10 +58,16 @@
 (defn offset-ltrb [^IRect rect dl dt dr db]
   (assert-good-cs rect)
   (assert-good-cs
-   (-> rect
-       ^IRect (offset-lt dl dt)
-       (.withRight (- (.getRight rect) dr))
-       (.withBottom (- (.getBottom rect) db)))))
+   (IRect/makeLTRB
+    (+ (.getLeft rect) dl) (+ (.getTop rect) dt)
+    (- (.getRight rect) dr) (- (.getBottom rect) db))))
+
+(defn offset-ltrb-float [^Rect rect dl dt dr db]
+  (assert-good-cs rect)
+  (assert-good-cs
+   (Rect/makeLTRB
+    (+ (.getLeft rect) dl) (+ (.getTop rect) dt)
+    (- (.getRight rect) dr) (- (.getBottom rect) db))))
 
 (defn offset-lw [rect dl width]
   (assert-good-cs rect)

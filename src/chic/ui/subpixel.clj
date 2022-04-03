@@ -8,7 +8,7 @@
    [io.github.humbleui.ui :as ui])
   (:import
    [io.github.humbleui.skija Canvas Font FontMetrics Paint TextLine]
-   [io.github.humbleui.types Point Rect]
+   [io.github.humbleui.types Point Rect IPoint]
    [java.lang AutoCloseable]))
 
 (defn event-propagate
@@ -16,7 +16,7 @@
    (event-propagate event child child-rect child-rect))
   ([event child child-rect offset]
    (when (and child child-rect)
-     (let [pos    (:hui.event/pos event)
+     (let [pos (:hui.event/pos event)
            event' (cond
                     (nil? pos)
                     event
@@ -34,7 +34,7 @@
 
 (defn row [& children]
   (cui/dyncomp
-    (cuilay/->Row (cuilay/flatten-container children) nil true)))
+   (cuilay/->Row (cuilay/flatten-container children) nil true)))
 
 (defrecord SubpixelGap [width height]
   IComponent
@@ -68,3 +68,21 @@
 
 (defn label-from-textline [^TextLine textline ^String text ^Font font ^Paint paint]
   (->SubpixelLabel text font paint textline (.getMetrics ^Font font)))
+
+(deftype+ SubpixelBoundary [child]
+  IComponent
+  (-measure [_ ctx cs]
+            (let [child-size(huip/-measure child ctx (Rect/makeXYWH (:x cs) (:y cs) (:width cs) (:height cs)))]
+              (IPoint. (Math/ceil (:width child-size)) (Math/ceil (:height child-size)))))
+  (-draw [_ ctx cs canvas]
+         (huip/-draw child ctx (Rect/makeXYWH (:x cs) (:y cs) (:width cs) (:height cs)) canvas))
+  (-event [_ event]
+          (let [cs (:chic.ui/component-rect event)]
+            (huip/-event child
+                         (assoc event :chic.ui/component-rect
+                                (Rect/makeXYWH (:x cs) (:y cs) (:width cs) (:height cs))))))
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn subpixel-boundary [child]
+  (->SubpixelBoundary child))

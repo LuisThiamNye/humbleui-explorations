@@ -473,9 +473,8 @@
                (let [textline ^TextLine (:textline (vswap! *draw-state assoc :textline
                                                  (cui.text/text-line (:content state) font-ui)))
                      textwidth (.getWidth textline)
-                     right-padding 2
-                     linewidth (Math/ceil (+ left-padding label-subpixel-offset textwidth right-padding))
-                     ctx (assoc ctx :linewidth linewidth)]
+                     right-padding 4
+                     linewidth (Math/ceil (+ left-padding label-subpixel-offset textwidth right-padding))]
                  (cui/clickable
                   (fn [event]
                     (when (:hui.event.mouse-button/is-pressed event)
@@ -483,9 +482,11 @@
                                  (let [p (cui/component-relative-pos event (:chic.ui/mouse-win-pos event))]
                                    (< (+ linewidth (:offset @*draw-state)) (:x p))))
                         (click-text-init model event))))
-                  (cuilay/size-dependent
-                   (fn [cs]
-                     (let [excess (min (unchecked-subtract (Math/floorDiv (:width cs) scale) linewidth) 0)]
+                  (ui/with-bounds
+                    :textbox-bounds
+                    (ui/dynamic
+                      ctx [{:keys[textbox-bounds]} ctx]
+                      (let [excess (min (unchecked-subtract (Math/ceil (/ (:width textbox-bounds) scale)) linewidth) 0)]
                        (cuilay/scrollable
                         (fn [event]
                           (vswap! *draw-state update :offset
@@ -495,50 +496,58 @@
                         (ui/dynamic
                           _ [{:keys [selection-idx cursor-idx prev-cursor-idx]} @*state]
                           (let [idx->x (fn [idx]
-                                         (+ left-padding (math/round (/ (.getCoordAtOffset textline idx) scale))))
+                                         (+ left-padding (/ (math/round (+ (* scale label-subpixel-offset)
+                                                                           (.getCoordAtOffset textline idx)))
+                                                            scale)))
                                 cursor-width 1
-                                cursor-x (idx->x cursor-idx)
-                                select-x (when selection-idx (idx->x selection-idx))
+                                cursor-x (- (idx->x cursor-idx) label-subpixel-offset)
                                 inner-ui
                                 (wrap-mousing-listener
                                  (cuilay/stack
                                   (cuilay/padding
                                    0 4
-                                   (cui.subpixel/row
-                                    (cui.subpixel/gap (+ left-padding label-subpixel-offset) 0)
-                                    (cui.subpixel/label-from-textline textline (:content state) font-ui fill-text)
-                                    (cui.subpixel/gap right-padding 0)))
+                                   (cui.subpixel/subpixel-boundary
+                                    (cui.subpixel/row
+                                     (cui.subpixel/gap (+ left-padding label-subpixel-offset) 0)
+                                     (cui.subpixel/label-from-textline textline (:content state) font-ui fill-text)
+                                     (cui.subpixel/gap right-padding 0))))
                                   ;; CURSOR
                                   (if (focus/has-focus? focus-manager focus-node)
-                                    (cuilay/row
-                                     (ui/gap cursor-x 0)
-                                     (ui/dynamic _ [{:keys [visible? cursor-blink-interval]} @*cursor-state]
-                                       (let [t (System/currentTimeMillis)]
-                                         (when (and (not selection-idx)
-                                                    (not (:mousing? @*state))
-                                                    (>= (unchecked-subtract t (:last-updated @*cursor-state))
-                                                        cursor-blink-interval))
-                                           (refresh-cursor-animation ctx *cursor-state (not visible?) t))
-                                         (ui/fill (if selection-idx
-                                                    (huipaint/fill 0x70000000)
-                                                    (if (:visible? @*cursor-state)
-                                                      fill-text
-                                                      (huipaint/fill 0x50000000)))
-                                                  (ui/gap cursor-width 0))))
-                                     [:stretch 1 (ui/gap 0 0)])
+                                    (cuilay/padding
+                                     cursor-x 0 0 0
+                                     (cuilay/row
+                                      (ui/dynamic _ [{:keys [visible? cursor-blink-interval]} @*cursor-state]
+                                        (let [t (System/currentTimeMillis)]
+                                          (when (and (not selection-idx)
+                                                     (not (:mousing? @*state))
+                                                     (>= (unchecked-subtract t (:last-updated @*cursor-state))
+                                                         cursor-blink-interval))
+                                            (refresh-cursor-animation ctx *cursor-state (not visible?) t))
+                                          (ui/fill (if selection-idx
+                                                     (huipaint/fill 0x70000000)
+                                                     (if (:visible? @*cursor-state)
+                                                       fill-text
+                                                       (huipaint/fill 0x50000000)))
+                                                   (ui/gap cursor-width 0))))
+                                      [:stretch 1 (ui/gap 0 0)]))
                                     (enc/do-nil
                                       (cancel-cursor-animation *cursor-state false)))
                                   ;; SELECTION
-                                  (when select-x
-                                    (let [start-x (min select-x cursor-x)
-                                          end-x (max select-x cursor-x)]
-                                      (cuilay/row
-                                       (ui/gap (cond-> start-x
-                                                 (< cursor-idx selection-idx)
-                                                 (+ cursor-width)) 0)
-                                       (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x380000FF)))
-                                                (ui/gap (unchecked-subtract-int end-x start-x) 0))
-                                       [:stretch 1 (ui/gap 0 0)])))))]
+                                  (when selection-idx
+                                    (let [select-x (idx->x selection-idx)
+                                          start-x (if (< cursor-idx selection-idx)
+                                                    (+ cursor-width cursor-x)
+                                                    select-x)
+                                          end-x (if (< selection-idx cursor-idx)
+                                                  cursor-x
+                                                  select-x)]
+                                      (cuilay/padding
+                                       start-x 0 0 0
+                                       (cuilay/row
+                                        (ui/fill (huipaint/fill 0x380000FF)
+                                                 (ui/gap (/ (math/round(* scale (unchecked-subtract end-x start-x))) scale) 0))
+                                        [:stretch 1 (ui/gap 0 0)]))
+                                      ))))]
                             (cui/on-draw
                              (fn [_ cs _]
                                ;; Make sure cursor is in view
@@ -547,7 +556,7 @@
                                  (vswap! *draw-state update :offset
                                          (fn [offset]
                                            (hui/clamp offset (- left-padding cursor-x)
-                                                      (min 0 (- (Math/floorDiv (:width cs) scale) cursor-x right-padding)))))))
+                                                      (min 0 (- (Math/ceil (/ (:width cs) scale)) cursor-x right-padding)))))))
                              (ui/dynamic
                                _ [offset (:offset @*draw-state)]
                                (cuilay/overflow-x offset inner-ui)))))))))))))))))]

@@ -5,12 +5,13 @@
   (:import
    [io.github.humbleui.skija FontMgr FontStyle Typeface Data]))
 
-(def input-font-path (let [s"/Volumes/Carbonator/csync/fonts/Input-Font/Input_Fonts/InputSans/InputSansCondensed/InputSansCondensed-Regular.ttf"]
+(def input-font-path (let [s "/Volumes/Carbonator/csync/fonts/Input-Font/Input_Fonts/InputSans/InputSansCondensed/InputSansCondensed-Regular.ttf"]
                        (when (fs/exists? s) s)))
 
 (def ^Typeface face-default
   (.matchFamiliesStyle (FontMgr/getDefault)
-                       (into-array String ["Roboto Slab", ".SF NS", "Helvetica Neue", "Arial"])
+                       (into-array String ["Roboto Slab", #_".SF NS" ;; slow?
+                                           "Helvetica Neue", "Arial"])
                        FontStyle/NORMAL))
 
 (def ^Typeface face-code-default

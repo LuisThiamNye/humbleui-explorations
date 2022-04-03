@@ -145,7 +145,7 @@
 (defn on-paint-handler [{:keys [*app-root window-obj *ctx *ui-error] :as w} ^Canvas canvas]
   (.clear canvas (unchecked-int 0xFFF6F6F6))
   (let [bounds (window-app-rect window-obj)
-        ctx (assoc @*ctx :scale (or 2 (huiwin/scale window-obj))
+        ctx (assoc @*ctx :scale (huiwin/scale window-obj)
                    :chic/current-window w
                    :chic.ui/component-rect bounds
                    :chic.ui/window-content-bounds bounds
@@ -197,6 +197,6 @@
   (remount-window (val (first @*windows)))
   (:window-obj (second (vals @*windows)))
   (:window-obj (first (vals @*windows)))
-
+(+ 0.5 (- 1 0.5))
   #!
   )

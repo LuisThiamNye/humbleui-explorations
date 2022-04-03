@@ -188,13 +188,15 @@
   (-measure
    [_ ctx cs]
    (let [{:keys [width height]}
-         (reduce
-          (fn [{:keys [x height]} child]
-            (let [child-size (measure-child
-                              child ctx (cui/offset-lt cs (min x (- (:right cs) (:x cs))) 0))]
-              (IPoint. (+ x (:width child-size)) (max height (:height child-size)))))
-          (IPoint. 0 0)
-          (keep #(nth % 2) children))]
+         (let [point (if subpixel?
+                       (fn [a b] (Point. a b))
+                       (fn [a b] (IPoint. a b)))](reduce
+           (fn [{:keys [x height]} child]
+             (let [child-size (measure-child
+                               child ctx (cui/offset-lt cs (min x (- (:right cs) (:x cs))) 0))]
+               (point (+ x (:width child-size)) (max height (:height child-size)))))
+           (point 0 0)
+           (keep #(nth % 2) children)))]
      (cui/rect-with-wh cs width height)))
 
   (-draw [_ ctx cs ^Canvas canvas]
@@ -204,7 +206,8 @@
                space (max 0 (- (:width cs) (transduce (keep :width) + 0 known)))
                stretch (transduce (keep (fn [[mode value _]] (when (= :stretch mode) value))) + 0 children)
                layer (.save canvas)
-               max-dx (:width cs)]
+               max-dx (:width cs)
+               offset-ltrb (if subpixel? cui/offset-ltrb-float cui/offset-ltrb)]
            (loop [dx 0
                   rects []
                   known known
@@ -216,12 +219,12 @@
                                              (Point. (-> space (/ stretch) (* value)) (:height cs))
                                              (IPoint. (-> space (/ stretch) (* value) (math/round)) (:height cs))))
                      child-width (:width child-size)
-                     rect (cui/offset-ltrb cs (min dx max-dx) 0 (max 0 (- max-dx child-width dx)) 0)]
+                     rect (offset-ltrb cs (min dx max-dx) 0 (max 0 (- max-dx child-width dx)) 0)]
                  (when child
                    (draw-child child ctx rect canvas))
                  (.translate canvas child-width 0)
                  (recur
-                  (min (+ dx (long child-width))
+                  (min (+ dx child-width)
                        #_(- (:right cs) (:x cs)))
                   (conj rects rect)
                   (next known)
