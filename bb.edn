@@ -1,2 +1,3 @@
 ;;
-{:tasks {repl (clojure "-M:lib/hotload:inspect/reveal:repl/cider:dev")}}
+{:tasks {repl (clojure "-M:lib/hotload:inspect/reveal:repl/cider:dev")
+         dev (clojure "-M:dev")}}

@@ -17,7 +17,15 @@
 
 (defn error-button [mode]
   (let [*x (atom false)
-        perform-error (fn [] (reset! *x false) (/ 0))]
+        perform-error (fn [] (reset! *x false)
+                        (if (= :stackoverflow mode)
+                          ((fn h [n]
+                             (let [_ (when (pos? n) (h (dec n)))]
+                               ((fn f []
+                                  (letfn [(g [] (some #{} [1 2]) (f))]
+                                    (concat [1 2] [2 3])(g))))))
+                           72850)
+                          (/ 0)))]
     (ui/dynamic
      ctx [x @*x
           {:keys [font-ui fill-text]} ctx]
@@ -118,6 +126,9 @@
                                          (cui/dyncomp (error-button :draw))
                                          (cuilay/padding
                                           0 4 (ui/label "But not this" font-ui fill-text))))))))
+                      (ui/gap 0 20)
+                      (cuilay/padding 4 (ui/label "Stack overflow due to recursion" font-ui fill-text))
+                      (cui/dyncomp (error-button :stackoverflow))
                       (ui/gap 0 20)
                       (cuilay/padding 4 (ui/label "Error boundary: -measure" font-ui fill-text))
                       (cui.error/bound-errors

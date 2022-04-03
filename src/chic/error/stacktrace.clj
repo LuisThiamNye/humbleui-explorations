@@ -249,7 +249,7 @@
            (let [[nrepeats remainder]
                  (reduce (fn [acc x]
                            [(inc (nth acc 0)) x])
-                         [0 []]
+                         [-1 []] ;; last element is non-repeated frames
                          (eduction (partition-leading-repeats segment)
                                    (subvec frames (inc end-idx))))]
              (ui/dynamic
@@ -266,6 +266,7 @@
        (stack-trace-segment-view frames)))))
 
 (comment
+
 
   (:start-idx (repeated-items-info --fs))
   (:end-idx (repeated-items-info --fs))

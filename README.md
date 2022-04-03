@@ -1,8 +1,8 @@
-# Experiments with HumbleUI
+# Proof of Concepts with HumbleUI
 
-A soup of unpolished code as I explore Clojure's potential to create dynamic and humane computing experiences.
+A soup of unpolished code from my explorations of Clojure's potential to create dynamic and humane computing experiences.
 
-Usage: `clj -M:dev`
+Usage: `clojure -M:dev` or `bb dev`
 
 Info:
 
@@ -15,6 +15,7 @@ Contents:
 - Dependency graph viewer
 - Error boundaries that show an image of the canvas before the error.
 - Stacktrace viewer where you can expand the frames to see the source of the relevant var and the line of the call site
+  - Collapses repeating frames of a StackOverflowError
 - Basic text input
 - Basic vim-like editor -- to be done better
 - Clojure var browser

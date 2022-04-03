@@ -1,6 +1,12 @@
 (ns chic.main
   (:require
+   [babashka.fs :as fs]
    [chic.focus :as focus]
+   [rebel-readline.core]
+   [rebel-readline.clojure.line-reader]
+   [rebel-readline.clojure.service.local]
+   [rebel-readline.clojure.main]
+   [clojure.main]
    [chic.style :as style]
    [chic.ui :as cui]
    [chic.demo :as demo]
@@ -10,14 +16,13 @@
    [borkdude.dynaload :refer [dynaload]]
    [io.github.humbleui.ui :as ui]
    [io.github.humbleui.window :as huiwin]
-   [nrepl.cmdline :as nrepl]
    [nrepl.server :as nrepl-server])
   (:import
    [io.github.humbleui.skija Font Paint]))
 
 (set! *warn-on-reflection* true)
 
-(def cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler))
+(def *cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler {:default nil}))
 
 (def *pressed-keys (volatile! #{}))
 (def focus-manager (focus/new-manager))
@@ -54,41 +59,39 @@
 
 (defn build-app-root []
   (ui/dynamic
-    ctx [scale (:scale ctx)
-         window (:chic/current-window ctx)]
-    (let [font-ui (Font. style/face-default (float (* 14 scale)))
-          leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
-          fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
-      (ui/with-context {:face-ui style/face-default
-                        :face-code style/face-code-default
-                        :font-code (Font. style/face-code-default (float (* 14 scale)))
-                        :font-ui font-ui
-                        :focus-manager focus-manager
-                        :leading leading
-                        :fill-text fill-text}
-        (cuilay/column
-         [:stretch 1
-          (cui/dyncomp
-           (demo/basic-view))]
-         #_[:stretch 1
+   ctx [scale (:scale ctx)
+        window (:chic/current-window ctx)]
+   (let [font-ui (Font. style/face-default (float (* 14 scale)))
+         leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
+         fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))]
+     (ui/with-context {:face-ui style/face-default
+                       :face-code style/face-code-default
+                       :font-code (Font. style/face-code-default (float (* 14 scale)))
+                       :font-ui font-ui
+                       :focus-manager focus-manager
+                       :leading leading
+                       :fill-text fill-text}
+       (cuilay/column
+        [:stretch 1
+         (cui/dyncomp
+          (demo/basic-view))]
+        #_[:stretch 1
+           (ui/gap 0 0)]
+        (cuilay/height
+         20
+         (ui/fill
+          (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
+          (cuilay/row
+           key-indicator
+           [:stretch 1
             (ui/gap 0 0)]
-         (cuilay/height
-          20
-          (ui/fill
-           (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
-           (cuilay/row
-            key-indicator
-            [:stretch 1
-             (ui/gap 0 0)]
-            (cui/clickable
-             (fn [event]
-               (when (:hui.event.mouse-button/is-pressed event)
-                 (windows/remount-window window)))
-             (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
-                      (cuilay/valign
-                       0.5 (cuilay/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
-
-
+           (cui/clickable
+            (fn [event]
+              (when (:hui.event.mouse-button/is-pressed event)
+                (windows/remount-window window)))
+            (ui/fill (doto (Paint.) (.setColor (unchecked-int 0x11000000)))
+                     (cuilay/valign
+                      0.5 (cuilay/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
 
 (defn make-main-window []
   (let [screen (last (hui/screens))
@@ -110,12 +113,24 @@
       (huiwin/set-visible true))))
 
 (defn -main [& args]
-  (future (apply nrepl/-main args))
-  (future
-    (Thread/sleep 1000)
-    (spit ".nrepl-port"
-          (:port (nrepl-server/start-server
-                  :port 7888 :handler cider-nrepl-handler))))
+  (.start
+   (Thread.
+    (fn []
+      (rebel-readline.core/with-line-reader
+        (rebel-readline.clojure.line-reader/create
+         (rebel-readline.clojure.service.local/create))
+        (clojure.main/repl
+         :prompt (fn [])
+         :read (rebel-readline.clojure.main/create-repl-read))))))
+  (spit ".nrepl-port"
+        (:port (nrepl-server/start-server
+                :port 7888
+                (if-some [cider-nrepl-handler @*cider-nrepl-handler]
+                  {:handler cider-nrepl-handler}
+                  {}))))
+  (.addShutdownHook
+   (Runtime/getRuntime)
+   (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
   (hui/start #(make-main-window)))
 
 (comment
@@ -130,10 +145,8 @@
 
   @(:*ctx (first (vals @windows/*windows)))
   (:*ui-error (second (vals @windows/*windows)))
-  ( @*app-root)
-  (io.github.humbleui.protocols/-draw (build-app-root) )
-
-  (remount-app)
+  (@*app-root)
+  (io.github.humbleui.protocols/-draw (build-app-root))
 
   (System/gc)
   ;; a single scope/chain for shortcuts/key events where there can only be one handler at most.

@@ -9,3 +9,5 @@ zig-cache
 *~undo-tree~
 .nrepl-port
 .#*
+.rebel_readline_history
+

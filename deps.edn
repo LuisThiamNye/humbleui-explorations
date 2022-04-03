@@ -25,8 +25,9 @@
 
  :aliases {
            :dev
-           {:extra-paths ["dev"]
-            :extra-deps  {nrepl/nrepl {:mvn/version "0.9.0"}}
-            :main-opts   ["-m" "chic.main" "--interactive"]}
+           {:extra-paths []
+            :extra-deps  {nrepl/nrepl {:mvn/version "0.9.0"}
+                          com.bhauman/rebel-readline {:mvn/version "0.1.4"}}
+            :main-opts   ["-m" "chic.main"]}
            ;;
            }}
