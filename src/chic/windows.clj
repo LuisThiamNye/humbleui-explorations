@@ -148,7 +148,7 @@
         ctx (assoc @*ctx :scale (huiwin/scale window-obj)
                    :chic/current-window w
                    :chic.profiling/time-since-last-paint
-                   (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w) 0))
+                   (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w)))
                    :chic.ui/component-rect bounds
                    :chic.ui/window-content-bounds bounds
                    :chic.error/make-render-error-window make-render-error-window)]
@@ -183,7 +183,8 @@
         w {:id id
            :*app-root *app-root
            :*ui-error (volatile! nil)
-           :*profiling (volatile! nil)
+           :*profiling (volatile! {:paint-start-time 0
+                                   :latest-paint-duration 0})
            :build-app-root build-app-root
            :*ctx (or *ctx (atom {}))
            :window-obj (huiwin/make
