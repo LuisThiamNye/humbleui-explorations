@@ -4,7 +4,7 @@
    [io.github.humbleui.protocols :as huip :refer [IComponent]])
   (:import
    [io.github.humbleui.skija Canvas Data]
-   (io.github.humbleui.skija.svg SVGLengthContext SVGDOM SVGLengthType)
+   (io.github.humbleui.skija.svg SVGLengthContext SVGDOM SVGSVG SVGLengthType)
    [io.github.humbleui.types IPoint Point]
    [java.lang AutoCloseable]))
 
@@ -16,7 +16,7 @@
                 (.getIntrinsicSize root lc)))
 
   (-draw [_ _ctx cs ^Canvas canvas]
-         (let [root (.getRoot dom)
+         (let [root ^SVGSVG (.getRoot dom)
                lc (SVGLengthContext. (Point. (:width cs) (:height cs)))
                width (.resolve lc (.getWidth root) SVGLengthType/HORIZONTAL)
                height (.resolve lc (.getHeight root) SVGLengthType/VERTICAL)

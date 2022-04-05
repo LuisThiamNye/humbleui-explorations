@@ -1,18 +1,12 @@
 (ns chic.main
   (:require
    [babashka.fs :as fs]
-   [chic.focus :as focus]
    [rebel-readline.core]
    [rebel-readline.clojure.line-reader]
    [rebel-readline.clojure.service.local]
    [rebel-readline.clojure.main]
    [clojure.main]
-   [chic.style :as style]
    [io.github.humbleui.paint :as huipaint]
-   [chic.ui :as cui]
-   [chic.demo :as demo]
-   [chic.ui.layout :as cuilay]
-   [chic.windows :as windows]
    [io.github.humbleui.core :as hui]
    [borkdude.dynaload :refer [dynaload]]
    [io.github.humbleui.ui :as ui]
@@ -21,7 +15,29 @@
   (:import
    [io.github.humbleui.skija Font Paint]))
 
+(require '[cheshire.core]
+         '[clojure.tools.reader]
+         '[taoensso.encore]
+         '[clojure.core.async]
+         '[clojure.tools.analyzer.jvm]
+         '[clojure-lsp.api]
+         '[tech.droit.fset])
+
 (set! *warn-on-reflection* true)
+
+(require '[chic.debug.swap :as debug.swap])
+;; (debug.swap/install-all-instrumentation!)
+
+(require '[chic.focus :as focus]
+         '[chic.style :as style]
+         '[chic.debug.debugger :as debugger]
+         '[chic.debug :as debug]
+         '[chic.ui.event :as uievt]
+         '[chic.ui :as cui]
+         '[chic.demo :as demo]
+         '[chic.ui.layout :as cuilay]
+         '[chic.windows :as windows])
+(debug.swap/install-all-instrumentation!)
 
 (def *cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler {:default nil}))
 
@@ -87,6 +103,15 @@
            key-indicator
            [:stretch 1
             (ui/gap 0 0)]
+           (cui/clickable
+            (uievt/on-primary-down (fn [_](debugger/show-error-window)))
+            (ui/dynamic
+              _ctx [error-count (count (:error-stack @debugger/*state))]
+              (ui/fill (huipaint/fill (if (pos? error-count)
+                                        0x20503000
+                                        0x09000000))
+                       (cuilay/valign
+                        0.5 (cuilay/padding 10 0 (ui/label (str error-count " E") font-ui fill-text))))))
            (ui/contextual
             (fn [{:keys [:chic.profiling/time-since-last-paint]}]
               (let [{:keys [latest-paint-duration]} @(:*profiling window)
@@ -95,10 +120,15 @@
                  (huipaint/fill (if (< 16000000 latest-paint-duration)
                                   0xFFFF0000
                                   0x00FFFFFF))
-                 (cuilay/padding
-                  5 0(cuilay/valign
-                      0.5 (ui/label (format "%d fps %6.3f ms"
-                                            (unchecked-int (/ 1000000000 time-since-last-paint)) millis) font-code fill-text)))))))
+                 (cuilay/width
+                  150
+                  (cuilay/halign
+                   1 (cuilay/padding
+                    5 0 (cuilay/valign
+                         0.5 (ui/label (format "%3d fps %6.3f ms"
+                                               (unchecked-int (/ 1000000000 time-since-last-paint))
+                                               millis)
+                                       font-code fill-text)))))))))
            (cui/clickable
             (fn [event]
               (when (:hui.event.mouse-button/is-pressed event)
@@ -136,15 +166,20 @@
         (clojure.main/repl
          :prompt (fn [])
          :read (rebel-readline.clojure.main/create-repl-read))))))
-  (spit ".nrepl-port"
-        (:port (nrepl-server/start-server
-                :port 7888
-                (if-some [cider-nrepl-handler @*cider-nrepl-handler]
-                  {:handler cider-nrepl-handler}
-                  {}))))
+  (.start
+   (Thread.
+    (fn []
+      (spit ".nrepl-port"
+           (:port (nrepl-server/start-server
+                   :port 7888
+                   (if-some [cider-nrepl-handler @*cider-nrepl-handler]
+                     {:handler cider-nrepl-handler}
+                     {})))))))
   (.addShutdownHook
    (Runtime/getRuntime)
    (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
+  (debugger/install-debug-ctx!)
+  (debug/attach-vm!)
   (hui/start #(make-main-window)))
 
 (comment
@@ -153,6 +188,8 @@
      (some-> (some #(when (= "main" (:id %)) %) (vals @windows/*windows))
              :window-obj huiwin/close)
      (make-main-window)))
+  (hui/doui-async (/ 0))
+  (hui/doui (.getUncaughtExceptionHandler (Thread/currentThread)))
 
   (def x (hui/doui-async (chic.windows/request-frame (first (vals @windows/*windows)))))
   (def x (hui/doui-async 5))

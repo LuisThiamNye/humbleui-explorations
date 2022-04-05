@@ -48,9 +48,47 @@
 #!
   )
 
-(defn stack-trace-segment-view [frames]
+(def ns-foreign-fill (huipaint/fill 0x80000000))
+(def ns-fill (huipaint/fill 0xC8005070))
+
+(defn ns-label [clsname]
   (ui/dynamic
    ctx [{:keys [font-ui fill-text]} ctx]
+   (ui/label clsname font-ui (if (str/starts-with? clsname "chic")
+                               ns-fill ns-foreign-fill))))
+
+(defn class-name-view [clsname]
+  (let [[_ nspart namepart] (re-matches #"(.+)/([^/]+|/)" (repl/demunge clsname))]
+    (ui/dynamic
+     ctx [{:keys [font-ui fill-text]} ctx]
+      (if nspart
+        (cuilay/row
+         (ui/label namepart font-ui fill-text)
+         (ui/gap 5 0)
+         (ns-label nspart))
+        (let [[_ nspart namepart] (re-matches #"(.+\.)([^.]+)" clsname)]
+          (cuilay/row
+          (ns-label nspart)
+          (ui/label namepart font-ui (huipaint/fill 0xd0000000))))))))
+
+(defn source-view [content line-idx]
+  (ui/dynamic
+    ctx [{:keys [font-code fill-text]} ctx]
+    (cuilay/padding
+    7 0 (cuilay/column
+         (for [[i line] (map-indexed #(vector %1 %2) (str/split-lines content))]
+           (ui/fill
+            (huipaint/fill (if (= i line-idx)
+                             0x50D0a020
+                             0x00000000))
+            (cuilay/padding
+             0 3
+             (ui/label line font-code fill-text))))
+         (ui/gap 0 10)))))
+
+(defn stack-trace-segment-view [frames]
+  (ui/dynamic
+    ctx [{:keys [font-ui fill-text]} ctx]
    (let [file-col-width 110
          text-vpadding 3
          file-label (fn [filename]
@@ -71,31 +109,9 @@
                                  (cuilay/padding
                                   0 text-vpadding (ui/label (str n) font-ui fill-text))
                                  (ui/gap 8 0))))))
-         ns-foreign-fill (huipaint/fill 0x80000000)
-         ns-fill (doto (Paint.) (.setColor (unchecked-int 0xC0003040)))
-         ns-label (fn [clsname]
-                    (ui/label clsname font-ui (if (str/starts-with? clsname "chic")
-                                                ns-fill ns-foreign-fill)))
          namespaced-seg (fn [clsname]
-                          (let [[_ nspart namepart] (re-matches #"(.+/)([^/]+|/)" (repl/demunge clsname))]
-                            (cuilay/row
-                             (when nspart
-                               (cuilay/padding
-                                0 text-vpadding (ns-label nspart)))
-                             (cuilay/padding
-                              0 text-vpadding (ui/label (or namepart clsname) font-ui fill-text)))))
-         source-view (fn [content idx]
-                       (cuilay/padding
-                        7 0 (cuilay/column
-                             (for [[i line] (map-indexed #(vector %1 %2) (str/split-lines content))]
-                               (ui/fill
-                                (doto (Paint.) (.setColor (unchecked-int (if (= i idx)
-                                                                           0x50D0a020
-                                                                           0x00000000))))
-                                (cuilay/padding
-                                 0 text-vpadding
-                                 (ui/label line font-ui fill-text))))
-                             (ui/gap 0 10))))]
+                          (cuilay/padding
+                           0 text-vpadding (class-name-view clsname)))]
      (cuilay/column
       (loop [children []
              frames (seq frames)]

@@ -2,7 +2,7 @@
   (:require
    [babashka.fs :as fs]
    [chic.util :as util]
-   [clojure.data.json :as json]
+   [cheshire.core :as json]
    [clojure.java.io :as io]
    [taoensso.encore :as enc])
   (:import
@@ -34,7 +34,12 @@
         (map (fn [s]
                (let [[_ category icon] (re-matches #"(.+)::(.+)" s)]
                  [icon category])))
-        (keys (json/read-str (slurp "https://raw.githubusercontent.com/google/material-design-icons/master/update/current_versions.json")))))
+        (keys (json/parse-stream
+               (java.io.BufferedReader.
+                (java.io.InputStreamReader.
+                 (.openStream
+                  (java.net.URL.
+                   "https://raw.githubusercontent.com/google/material-design-icons/master/update/current_versions.json"))))))))
 
 (def *svg-bytes-cache (atom {}))
 

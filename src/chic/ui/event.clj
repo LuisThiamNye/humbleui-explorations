@@ -5,7 +5,7 @@
 (defn on-primary-down [handler]
   (fn [event]
     (when (and (:hui.event.mouse-button/is-pressed event)
-               (identical? MouseButton/PRIMARY (.getButton (:event event))))
+               (identical? MouseButton/PRIMARY (.getButton ^EventMouseButton (:event event))))
      (handler event))))
 
 (defn mouse-button [event]

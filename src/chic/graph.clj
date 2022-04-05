@@ -322,12 +322,7 @@
                      (edge-view model id connected-nodes connected-id)))
                   connected-nodes)))
               nodes)))
-           (eduction (map (fn [id]
-                            (when-not (contains? (:nodes @*draw-state) id)
-                              (vswap! *draw-state assoc-in [:nodes id]
-                                      {:velocity (Point. 0 0)
-                                       :position (Point. 0 0)}))
-                            (node-view model id)))
+           (eduction (map (fn [id] (node-view model id)))
                      (keys nodes))
            (eduction (map (fn [id] (annotation-view model id)))
                      (keys nodes)))))))))))
@@ -510,7 +505,11 @@
                                        :compression? true
                                        :repel-connected? false
                                        :distribute-spring? true}})
-        *draw-state (volatile! {:nodes {}
+        *draw-state (volatile! {:nodes (into {}
+                                             (map (fn [id]
+                                                    [id {:velocity (Point. 0 0)
+                                                         :position (Point. 0 0)}]))
+                                             (keys nodes))
                                 :t (System/currentTimeMillis)})]
     ;; (def --ds *draw-state)
     {:*state *state :*draw-state *draw-state}))

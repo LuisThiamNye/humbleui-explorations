@@ -1,6 +1,7 @@
 (ns chic.windows
   (:require
    [chic.debug :as debug]
+   [taoensso.encore :as enc]
    [chic.ui.event :as uievt]
    [io.github.humbleui.paint :as huipaint]
    [chic.protocols]
@@ -11,21 +12,52 @@
    [chic.ui.error :as cui.error]
    [chic.ui.layout :as cuilay]
    [io.github.humbleui.core :as hui]
+   [io.github.humbleui.protocols :as huip]
    [io.github.humbleui.profile :as profile]
    [io.github.humbleui.ui :as ui]
    [io.github.humbleui.window :as huiwin])
   (:import
    [io.github.humbleui.jwm EventMouseButton EventMouseMove EventMouseScroll
-    EventKey EventWindowFocusOut App]
+    EventKey EventWindowFocusOut App Window EventWindowResize]
    [io.github.humbleui.skija Canvas Font Paint]
    [io.github.humbleui.types IPoint]))
 
+(defmacro on-ui-thread? []
+  `(App/_onUIThread))
+
+(defmacro dosendui [& body]
+  `(do
+     (App/runOnUIThread #(try ~@body (catch Throwable t# nil)))
+     nil))
+
+(defmacro safe-dosendui [& body]
+  `(let [f# #(try ~@body (catch Throwable t# nil))]
+    (if (App/_onUIThread)
+     (f#)
+     (App/runOnUIThread f#))
+    nil))
+
+(defmacro safe-doui-async [& body]
+  `(let [p# (promise)
+         f# #(deliver p# (try ~@body (catch Throwable t# t#)))]
+     (if (App/_onUIThread) ;; doui causes freeze if already on UI
+       (f#)
+       (App/runOnUIThread f#))
+     p#))
+
+(defmacro safe-doui [& body]
+  `(let [res# (deref (safe-doui-async ~@body))]
+     (if (instance? Throwable res#)
+       (throw res#)
+       res#)))
+
 (defn request-frame [{:keys [window-obj]}]
   {:pre [(instance? io.github.humbleui.jwm.Window window-obj)]}
-  (if (App/_onUIThread) ;; doui causes freeze if already on UI
-    (huiwin/request-frame window-obj)
-    (hui/doui
-     (huiwin/request-frame window-obj))))
+  (safe-dosendui (huiwin/request-frame window-obj)))
+
+(defn activate-window [{:keys [^Window window-obj]}]
+  {:pre [(instance? io.github.humbleui.jwm.Window window-obj)]}
+  (safe-dosendui (.focus window-obj)))
 
 (defonce *windows (atom {}))
 
@@ -93,6 +125,9 @@
                                            :hui.event.key/key (.getName (.getKey ^EventKey event))
                                            :eventkey event}))
 
+                      EventWindowResize
+                      true
+
                       nil)]
        (when changed?
          (vswap! (:*profiling win) assoc :event-triggers-change-time (System/nanoTime))
@@ -145,18 +180,21 @@
 (defn on-paint-handler [{:keys [*app-root window-obj *ctx *ui-error] :as w} ^Canvas canvas]
   (.clear canvas (unchecked-int 0xFFF6F6F6))
   (let [bounds (window-app-rect window-obj)
-        ctx (assoc @*ctx :scale (huiwin/scale window-obj)
-                   :chic/current-window w
-                   :chic.profiling/time-since-last-paint
-                   (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w)))
-                   :chic.ui/component-rect bounds
-                   :chic.ui/window-content-bounds bounds
-                   :chic.error/make-render-error-window make-render-error-window)]
+        scale(huiwin/scale window-obj)
+        ctx (enc/merge
+             (assoc @*ctx :scale scale
+                    :chic/current-window w
+                    :chic.profiling/time-since-last-paint
+                    (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w)))
+                    :chic.ui/component-rect bounds
+                    :chic.ui/window-content-bounds bounds
+                    :chic.error/make-render-error-window make-render-error-window)
+             (style/context-default {:scale scale}))]
     (profile/reset)
     (vswap! (:*profiling w) assoc :paint-start-time (System/nanoTime))
     (profile/measure
      "frame"
-     (try (ui/draw @*app-root ctx bounds canvas)
+     (try (huip/-draw @*app-root ctx bounds canvas)
           (catch Throwable e
             (vreset! *ui-error {:bitmap (error/canvas->bitmap canvas bounds)
                                 :throwable e
@@ -165,10 +203,10 @@
                                 :cs bounds})
             (.clear canvas (unchecked-int 0xFFF6F6F6))
             (vreset! *app-root (cui/dyncomp (error-view)))
-            (ui/draw @*app-root ctx bounds canvas))))
+            (huip/-draw @*app-root ctx bounds canvas))))
     (vswap! (:*profiling w) assoc :latest-paint-duration
             (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w))))
-    #_(request-frame w)
+    #_(enc/after-timeout 1000 (request-frame w))
     #_(let [{:keys [paint-start-time event-triggers-change-time paint-done-time]} @(:*profiling w)]
         (chic.debug/println-main
          "(ms)"
@@ -177,6 +215,7 @@
     #_(profile/log)))
 
 (defn make [{:keys [id on-close *app-root on-paint on-event *ctx build-app-root] :as opts}]
+  {:pre [(on-ui-thread?)]}
   (let [on-paint (or on-paint #'on-paint-handler)
         on-event (or on-event #'on-event-handler)
         *app-root (or *app-root (volatile! nil))

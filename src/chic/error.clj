@@ -50,7 +50,7 @@
              (full-error-view-of error)))))
 
 (defn partial-canvas-preview [^Bitmap bitmap]
-  (let [imageinfo (.getImageInfo bitmap)
+  (let [imageinfo ^ImageInfo (.getImageInfo bitmap)
         ratio (/ (.getHeight imageinfo) (.getWidth imageinfo))]
     (ui/dynamic
       ctx [{:keys [scale]} ctx]
@@ -76,7 +76,8 @@
     ctx [{:keys [scale]} ctx]
     (ui/with-context
       {:font-ui (Font. style/face-code-default (float (* scale 12)))
-       :fill-text (huipaint/fill 0xFF000000)}
+       :fill-text (huipaint/fill 0xFF000000)
+       :font-code (Font. style/face-code-default (float (* 12 scale)))}
       (ui/dynamic
         ctx [{:keys [fill-text font-ui]} ctx]
         (ui/fill

@@ -1,6 +1,7 @@
 (ns chic.demo
   (:require
    [chic.ui.event :as uievt]
+   [chic.digger :as digger]
    [chic.cljbwr :as cljbwr]
    [chic.depview :as depview]
    [io.github.humbleui.paint :as huipaint]
@@ -78,7 +79,7 @@
      (ui/fill
       (huipaint/fill 0xFFb0b0b0)
       (cuilay/row
-       (for [tab [:home :namespaces :browser :cljbrowser]]
+       (for [tab [:home :namespaces :browser :cljbrowser :digger]]
          [:stretch 1
           (cui/clickable
            (uievt/on-primary-down (fn [_] (swap! *state assoc :selected-tab tab)))
@@ -141,4 +142,5 @@
                       (ui/gap 0 30)))))
         :browser (cui/dyncomp (filebwr/basic-view))
         :cljbrowser (cui/dyncomp (cljbwr/basic-view))
-        :namespaces (cui/dyncomp (depview/basic-view)))])))
+        :namespaces (cui/dyncomp (depview/basic-view))
+        :digger (cui/dyncomp (digger/basic-view)))])))

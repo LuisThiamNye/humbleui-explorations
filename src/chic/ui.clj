@@ -5,7 +5,8 @@
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
    [io.github.humbleui.ui :as ui])
   (:import
-   [io.github.humbleui.skija Canvas]
+   [io.github.humbleui.skija Canvas Font Paint]
+   [io.github.humbleui.skija.shaper ShapingOptions Shaper]
    [io.github.humbleui.types IPoint IRect Rect Point]
    [java.lang AutoCloseable]))
 #_#_#_#_(defmethod print-method IRect [o w]
@@ -27,6 +28,17 @@
 
   (defmethod print-method Point [o w]
     (print-simple (str "#Point[" (.getX o) " " (.getY o) "]") w))
+
+(def ^:private ^Shaper shaper (Shaper/makeShapeDontWrapOrReorder))
+
+(alter-var-root
+ #'ui/label
+ (fn [_]
+   (fn label [^String text ^Font font ^Paint paint & features]
+     {:pre [(some? font) (some? paint)]}
+    (let [opts (reduce #(.withFeatures ^ShapingOptions %1 ^String %2) ShapingOptions/DEFAULT features)
+          line (.shapeLine shaper text font ^ShapingOptions opts)]
+      (ui/->Label text font paint line (.getMetrics ^Font font))))))
 
 (defn assert-good-cs [cs]
   (when (or (instance? Point cs) (instance? IPoint cs)
@@ -76,7 +88,7 @@
      (let [r (+ (.getLeft ^IRect rect) dl width)]
        (.withRight ^IRect (offset-lt rect dl 0) (min Integer/MAX_VALUE r)))
      (let [r (+ (.getLeft ^Rect rect) dl width)]
-      (.withRight ^Rect (offset-lt rect dl 0) (min Integer/MAX_VALUE r))))))
+       (.withRight ^Rect (offset-lt rect dl 0) (min Integer/MAX_VALUE r))))))
 
 (defn offset-th [rect dt height]
   (assert-good-cs rect)
@@ -87,9 +99,9 @@
                               (+ (.getTop ^IRect rect) dt))
                     (min Integer/MAX_VALUE b)))
      (let [b (+ (.getTop ^Rect rect) dt height)]
-      (.withBottom (.withTop (.withLeft ^Rect rect (+ (.getLeft ^Rect rect) 0))
-                             (+ (.getTop ^Rect rect) dt))
-                   (min Integer/MAX_VALUE b))))))
+       (.withBottom (.withTop (.withLeft ^Rect rect (+ (.getLeft ^Rect rect) 0))
+                              (+ (.getTop ^Rect rect) dt))
+                    (min Integer/MAX_VALUE b))))))
 
 (defn rect-with-wh
   ([{:keys [width height]}]
@@ -134,7 +146,7 @@
   (if (instance? IRect rect)
     (-> ^IRect rect
         (.withRight (min Integer/MAX_VALUE
-                          (+ (:x rect) Integer/MAX_VALUE))))
+                         (+ (:x rect) Integer/MAX_VALUE))))
     (assoc rect :width Integer/MAX_VALUE)))
 
 (defn unbounded-bottom [rect]
@@ -145,15 +157,36 @@
                           (+ (:y rect) Integer/MAX_VALUE))))
     (assoc rect :height Integer/MAX_VALUE)))
 
+(defn intersect-rect [^IRect rect subrect]
+  (or (.intersect rect subrect) (rect-with-wh rect 0 0)))
+
+(defmacro -component-typed-rect-contains? [cls rect pos]
+  (let [rect (vary-meta rect assoc :tag cls)]
+    `(let [{x# :x y# :y} ~pos
+           rect# ~rect]
+       (and (<= (.getLeft rect#) x#)
+           (<= (.getTop rect#) y#)
+           (< x# (.getRight rect#))
+           (< y# (.getBottom rect#))))))
+
+(defn component-irect-contains? [rect point]
+  (-component-typed-rect-contains? IRect rect point))
+
 (defn point-in-component? [{rect :chic.ui/component-rect} pos]
   {:pre [(some? pos)]}
   (if (instance? IRect rect)
-    (.contains ^IRect rect pos)
-    (.contains ^Rect rect pos))
-  #_(and (<= (:x rect) (:x pos))
-       (<= (:x pos) (+ (:x rect) (:width rect)))
-       (<= (:y rect) (:y pos))
-       (<= (:y pos) (+ (:y rect) (:height rect)))))
+    (-component-typed-rect-contains? IRect rect pos)
+    (-component-typed-rect-contains? Rect rect pos)))
+
+(defn point-visible? [{:keys [::point-visible?]} point]
+  (if point-visible?
+    (point-visible? point)
+    true))
+
+(defn push-point-clip [ctx point->visible?]
+  (assoc ctx ::point-visible?
+         (fn [point] (and (point-visible? ctx point)
+                          (point->visible? point)))))
 
 (defn component-relative-pos [{rect :chic.ui/component-rect} pos]
   (IPoint. (unchecked-subtract-int (:x pos) (:x rect))
@@ -205,10 +238,6 @@
        (huip/-measure child (child-ctx ctx child cs) cs))))
 
 (defn rects-overlap? [r1 {:keys [x y right bottom]}]
-  #_(or (.contains r1 x y)
-      (.contains r1 x bottom)
-      (.contains r1 right y)
-      (.contains r1 right bottom))
   (and (<= (:x r1) right)
        (<= x (:right r1))
        (<= (:y r1) bottom)
@@ -234,7 +263,8 @@
   (-draw [_ ctx cs canvas]
          (set! child-rect cs)
          (set! hovered? (when-let [pos (:chic.ui/mouse-win-pos ctx)]
-                          (point-in-component? ctx pos)))
+                          (and (point-in-component? ctx pos)
+                               (point-visible? ctx pos))))
          (let [ctx' (cond-> ctx
                       hovered? (assoc :hui/hovered? true)
                       (and pressed? hovered?) (assoc :hui/active? true))]
@@ -244,7 +274,8 @@
           (hui/eager-or
            (when (or (= :hui/mouse-button (:hui/event event))
                      (= :hui/mouse-move (:hui/event event)))
-             (let [hovered?' (point-in-component? event (:chic.ui/mouse-win-pos event))]
+             (let [hovered?' (and (point-in-component? event (:chic.ui/mouse-win-pos event))
+                                  (point-visible? event (:chic.ui/mouse-win-pos event)))]
                (when (not= hovered? hovered?')
                  ;; (clojure.pprint/pprint event)
                  (set! hovered? hovered?')
@@ -319,3 +350,68 @@
 
 (defn on-draw [on-draw child]
   (->BeforeDrawHook on-draw child))
+
+(deftype+ ShadowRect [dx dy blur spread colour child]
+  IComponent
+  (-measure [_ ctx cs] (measure-child child ctx cs))
+  (-draw [_ ctx {:keys [width height] :as cs} ^Canvas canvas]
+         (.drawRectShadow canvas (Rect/makeXYWH 0 0 width height)
+                          dx dy blur spread colour)
+         (draw-child child ctx cs canvas))
+  (-event [_ event] (huip/-event child event))
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn shadow-rect [dx dy blur spread colour child]
+  (dyncomp
+   (->ShadowRect (float dx) (float dy) (float blur) (float spread) (unchecked-int colour) child)))
+
+(deftype+ WithBounds [key child ^:mut bounds ^:mut child-rect]
+  IComponent
+  (-measure [_ ctx cs] (huip/-measure child (assoc ctx key (or bounds cs)) cs))
+
+  (-draw [_ ctx cs ^Canvas canvas]
+         (set! child-rect (IRect/makeXYWH 0 0 (:width cs) (:height cs)))
+         (let [width (-> (:width cs) (/ (:scale ctx)))
+               height (-> (:height cs) (/ (:scale ctx)))]
+           (set! bounds (IPoint. width height))
+           (huip/-draw child (assoc ctx key bounds) cs canvas)))
+
+  (-event [_ event] (event-propagate event child child-rect))
+
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn with-bounds [key child]
+  (->WithBounds key child nil nil))
+
+(deftype+ EffectHandler [handler child]
+  IComponent
+  (-measure [_ ctx cs]
+            (huip/-measure child ctx cs))
+
+  (-draw [_ ctx cs ^Canvas canvas]
+         (huip/-draw child ctx cs canvas))
+
+  (-event [_ event]
+          (huip/-event child
+                       (assoc event ::effect-handler
+                              (if-let [f (::effect-handler event)]
+                                (comp f handler)
+                                handler))))
+
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn on [effectkey handler child]
+  (->EffectHandler (fn [effects]
+                     (reduce (fn [result effect]
+                               (if (= effectkey (nth effect 0))
+                                 (into result (handler (nth effect 1)))
+                                 (conj result effect)))
+                             []
+                             effects)) child))
+
+(defn emit [event effects]
+  (when-let [f (::effect-handler event)]
+    (f effects)))
