@@ -1,6 +1,7 @@
 (ns chic.windows
   (:require
    [chic.debug :as debug]
+   [chic.util :as util]
    [taoensso.encore :as enc]
    [chic.ui.event :as uievt]
    [io.github.humbleui.paint :as huipaint]
@@ -90,8 +91,8 @@
     (profile/measure
      "event"
      (let [app-root @*app-root
-           make-evt (fn [m] (merge (assoc m :chic.ui/component-rect (window-app-rect window-obj))
-                                   @*ctx))
+           make-evt (fn [m] (merge @*ctx
+                                   (assoc m :chic.ui/component-rect (window-app-rect window-obj))))
            changed? (condp instance? event
                       EventMouseMove
                       (let [pos (IPoint. (.getX ^EventMouseMove event) (.getY ^EventMouseMove event))
@@ -181,15 +182,17 @@
   (.clear canvas (unchecked-int 0xFFF6F6F6))
   (let [bounds (window-app-rect window-obj)
         scale(huiwin/scale window-obj)
-        ctx (enc/merge
-             (assoc @*ctx :scale scale
-                    :chic/current-window w
-                    :chic.profiling/time-since-last-paint
-                    (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w)))
-                    :chic.ui/component-rect bounds
-                    :chic.ui/window-content-bounds bounds
-                    :chic.error/make-render-error-window make-render-error-window)
-             (style/context-default {:scale scale}))]
+        ctx (swap! *ctx
+                   (fn [ctx]
+                     (enc/merge
+                      (assoc (util/assoc-if-not= ctx :scale scale)
+                            :chic/current-window w
+                            :chic.profiling/time-since-last-paint
+                            (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w)))
+                            :chic.ui/component-rect bounds
+                            :chic.ui/window-content-bounds bounds
+                            :chic.error/make-render-error-window make-render-error-window)
+                     (style/context-default {:scale scale}))))]
     (profile/reset)
     (vswap! (:*profiling w) assoc :paint-start-time (System/nanoTime))
     (profile/measure

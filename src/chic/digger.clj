@@ -77,7 +77,8 @@
 (defonce *state (new-session nil))
 
 (defn digger-tap-handler [x]
-  (swap! *state assoc :inspectors [(new-inspector x)]))
+  (close-session *state)
+  (reset! *state (new-session (new-inspector x))))
 
 (add-tap #'digger-tap-handler)
 

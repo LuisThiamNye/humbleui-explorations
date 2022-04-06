@@ -8,5 +8,11 @@
                (identical? MouseButton/PRIMARY (.getButton ^EventMouseButton (:event event))))
      (handler event))))
 
+(defn on-primary-up [handler]
+  (fn [event]
+    (when (and (not (:hui.event.mouse-button/is-pressed event))
+               (identical? MouseButton/PRIMARY (.getButton ^EventMouseButton (:event event))))
+      (handler event))))
+
 (defn mouse-button [event]
   (.getButton ^EventMouseButton (:event event)))

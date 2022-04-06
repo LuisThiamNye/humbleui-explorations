@@ -22,6 +22,7 @@
          '[clojure.tools.analyzer.jvm]
          '[clojure-lsp.api]
          '[tech.droit.fset])
+(def *cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler {:default nil}))
 
 (set! *warn-on-reflection* true)
 
@@ -37,9 +38,7 @@
          '[chic.demo :as demo]
          '[chic.ui.layout :as cuilay]
          '[chic.windows :as windows])
-(debug.swap/install-all-instrumentation!)
-
-(def *cider-nrepl-handler (dynaload 'cider.nrepl/cider-nrepl-handler {:default nil}))
+;; (debug.swap/install-all-instrumentation!)
 
 (def *pressed-keys (volatile! #{}))
 (def focus-manager (focus/new-manager))
@@ -76,8 +75,7 @@
 
 (defn build-app-root []
   (ui/dynamic
-   ctx [scale (:scale ctx)
-        window (:chic/current-window ctx)]
+   ctx [scale (:scale ctx)]
    (let [font-ui (Font. style/face-default (float (* 14 scale)))
          leading (-> font-ui .getMetrics .getCapHeight Math/ceil (/ scale))
          fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))
@@ -113,8 +111,8 @@
                        (cuilay/valign
                         0.5 (cuilay/padding 10 0 (ui/label (str error-count " E") font-ui fill-text))))))
            (ui/contextual
-            (fn [{:keys [:chic.profiling/time-since-last-paint]}]
-              (let [{:keys [latest-paint-duration]} @(:*profiling window)
+            (fn [{:keys [:chic.profiling/time-since-last-paint :chic/current-window]}]
+              (let [{:keys [latest-paint-duration]} @(:*profiling current-window)
                     millis (/ latest-paint-duration 1000000.)]
                 (ui/fill
                  (huipaint/fill (if (< 16000000 latest-paint-duration)
@@ -132,7 +130,7 @@
            (cui/clickable
             (fn [event]
               (when (:hui.event.mouse-button/is-pressed event)
-                (windows/remount-window window)))
+                (windows/remount-window (:chic/current-window event))))
             (ui/fill (huipaint/fill 0x11000000)
                      (cuilay/valign
                       0.5 (cuilay/padding 20 0 (ui/label "Reload" font-ui fill-text)))))))))))))
@@ -178,8 +176,8 @@
   (.addShutdownHook
    (Runtime/getRuntime)
    (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
-  (debugger/install-debug-ctx!)
-  (debug/attach-vm!)
+  ;; (debug/attach-vm!)
+  ;; (debugger/install-debug-ctx!)
   (hui/start #(make-main-window)))
 
 (comment

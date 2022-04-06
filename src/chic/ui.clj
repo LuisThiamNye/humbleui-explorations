@@ -1,8 +1,10 @@
 (ns chic.ui
   (:require
+   [chic.util :as util]
    [clojure.pprint :as pp]
    [io.github.humbleui.core :as hui :refer [deftype+]]
    [io.github.humbleui.protocols :as huip :refer [IComponent]]
+   [io.github.humbleui.profile :as profile]
    [io.github.humbleui.ui :as ui])
   (:import
    [io.github.humbleui.skija Canvas Font Paint]
@@ -36,9 +38,36 @@
  (fn [_]
    (fn label [^String text ^Font font ^Paint paint & features]
      {:pre [(some? font) (some? paint)]}
-    (let [opts (reduce #(.withFeatures ^ShapingOptions %1 ^String %2) ShapingOptions/DEFAULT features)
-          line (.shapeLine shaper text font ^ShapingOptions opts)]
-      (ui/->Label text font paint line (.getMetrics ^Font font))))))
+     (let [opts (reduce #(.withFeatures ^ShapingOptions %1 ^String %2) ShapingOptions/DEFAULT features)
+           line (.shapeLine shaper text font ^ShapingOptions opts)]
+       (ui/->Label text font paint line (.getMetrics ^Font font))))))
+
+(alter-var-root
+ #'hui/memoize-last
+ (fn [_]
+   (fn memoize-last [ctor]
+     (let [*atom (volatile! nil)]
+       (fn [& args']
+         (or
+          (when-some [[args value] @*atom]
+            (if (some false? (map #(if (number? %1) (= %1 %2) (identical? %1 %2)) args args'))
+              (when (instance? AutoCloseable value)
+                (.close ^AutoCloseable value))
+              value))
+          (let [value' (apply ctor args')]
+            (vreset! *atom [args' value'])
+            value')))))))
+
+#_(alter-var-root
+   #'ui/dynamic
+   (fn [_]
+     (fn dynamic [&form &env ctx-sym bindings & body]
+       (let [syms (ui/bindings->syms bindings)]
+         `(let [inputs-fn# (core/memoize-last (fn [~@syms] ~@body))]
+            (contextual
+             (fn [~ctx-sym]
+               (let [~@bindings]
+                 (inputs-fn# ~@syms)))))))))
 
 (defn assert-good-cs [cs]
   (when (or (instance? Point cs) (instance? IPoint cs)
@@ -165,9 +194,9 @@
     `(let [{x# :x y# :y} ~pos
            rect# ~rect]
        (and (<= (.getLeft rect#) x#)
-           (<= (.getTop rect#) y#)
-           (< x# (.getRight rect#))
-           (< y# (.getBottom rect#))))))
+            (<= (.getTop rect#) y#)
+            (< x# (.getRight rect#))
+            (< y# (.getBottom rect#))))))
 
 (defn component-irect-contains? [rect point]
   (-component-typed-rect-contains? IRect rect point))
@@ -366,24 +395,30 @@
   (dyncomp
    (->ShadowRect (float dx) (float dy) (float blur) (float spread) (unchecked-int colour) child)))
 
-(deftype+ WithBounds [key child ^:mut bounds ^:mut child-rect]
+(deftype+ WithBounds [key child ^:mut bounds]
   IComponent
-  (-measure [_ ctx cs] (huip/-measure child (assoc ctx key (or bounds cs)) cs))
+  (-measure [_ ctx cs]
+            (huip/-measure
+             child (assoc ctx key (or bounds
+                                      (IPoint.
+                                       (-> (:width cs) (/ (:scale ctx)))
+                                       (-> (:height cs) (/ (:scale ctx)))))) cs))
 
   (-draw [_ ctx cs ^Canvas canvas]
-         (set! child-rect (IRect/makeXYWH 0 0 (:width cs) (:height cs)))
          (let [width (-> (:width cs) (/ (:scale ctx)))
-               height (-> (:height cs) (/ (:scale ctx)))]
-           (set! bounds (IPoint. width height))
+               height (-> (:height cs) (/ (:scale ctx)))
+               bounds' (IPoint. width height)]
+           (when-not (= bounds bounds')
+             (set! bounds bounds'))
            (huip/-draw child (assoc ctx key bounds) cs canvas)))
 
-  (-event [_ event] (event-propagate event child child-rect))
+  (-event [_ event] (huip/-event child event))
 
   AutoCloseable
   (close [_] (ui/child-close child)))
 
 (defn with-bounds [key child]
-  (->WithBounds key child nil nil))
+  (->WithBounds key child nil))
 
 (deftype+ EffectHandler [handler child]
   IComponent
@@ -415,3 +450,64 @@
 (defn emit [event effects]
   (when-let [f (::effect-handler event)]
     (f effects)))
+
+(deftype+ UpdatingContext [xf child]
+  IComponent
+  (-measure [_ ctx cs] (measure-child child (xf ctx) cs))
+
+  (-draw [_ ctx cs ^Canvas canvas]
+         (draw-child child (xf ctx) cs canvas))
+
+  (-event [_ event] (huip/-event child event))
+
+  AutoCloseable (close [_] (ui/child-close child)))
+
+(defn updating-ctx [f child]
+  (dyncomp (->UpdatingContext f child)))
+
+#_(deftype+ PathsSubscribe [child-ctor ^:mut child ^:mut outdated?]
+    IComponent
+    (-measure [_ ctx cs]
+              (let [child' (child-ctor ctx)]
+                (when-not (identical? child child')
+                  (ui/child-close child)
+                  (set! child child')))
+              (huip/-measure child ctx cs))
+
+    (-draw [_ ctx cs canvas]
+           (let [child' (child-ctor ctx)]
+             (when-not (identical? child child')
+               (ui/child-close child)
+               (set! child child')))
+           (huip/-draw child ctx cs canvas))
+
+    (-event [_ event] (huip/-event child event))
+
+    AutoCloseable (close [_] (ui/child-close child)))
+
+#_(defn subscribe-paths [child]
+    (dyncomp (->PathsSubscribe child)))
+
+(deftype+ WithBounds [k child ^:mut bounds]
+  IComponent
+  (-measure [_ ctx cs]
+            (huip/-measure child
+                           (assoc ctx k (or bounds
+                                            (IPoint. (-> (:width cs) (/ (:scale ctx)))
+                                                     (-> (:height cs) (/ (:scale ctx)))))) cs))
+
+  (-draw [_ ctx cs ^Canvas canvas]
+         (let [width (-> (:width cs) (/ (:scale ctx)))
+               height (-> (:height cs) (/ (:scale ctx)))
+               bounds' (IPoint. width height)]
+           (when-not (= bounds bounds')
+             (set! bounds bounds'))
+           (huip/-draw child (assoc ctx k bounds) cs canvas)))
+
+  (-event [_ event] (huip/-event child event))
+
+  AutoCloseable
+  (close [_] (ui/child-close child)))
+
+(defn with-bounds [key child]
+  (->WithBounds key child nil))

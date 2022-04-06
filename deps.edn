@@ -10,7 +10,7 @@
         io.github.humbleui/skija-linux       {:mvn/version "0.100.0" :exclusions [io.github.humbleui/types]}
         io.github.humbleui/skija-macos-x64   {:mvn/version "0.100.0" :exclusions [io.github.humbleui/types]}
         io.github.humbleui/skija-macos-arm64 {:mvn/version "0.100.0" :exclusions [io.github.humbleui/types]}
-        com.github.clojure-lsp/clojure-lsp {:mvn/version "2022.03.26-18.47.08"}
+        com.github.clojure-lsp/clojure-lsp {:mvn/version "2022.03.31-20.00.20"}
         clj-kondo/clj-kondo {:mvn/version "2022.03.09"}
         babashka/fs {:mvn/version "0.1.4"}
         cheshire/cheshire {:mvn/version "5.10.2"}
@@ -21,7 +21,7 @@
         tech.droit/fset {:mvn/version "0.1.1"}
         town.lilac/cascade {:mvn/version "1.2.0"}
         borkdude/dynaload {:mvn/version "0.2.2"}
-        rewrite-clj/rewrite-clj {:mvn/version "1.0.699-alpha"}}
+        rewrite-clj/rewrite-clj {:mvn/version "1.0.767-alpha"}}
 
  :aliases {
            :dev

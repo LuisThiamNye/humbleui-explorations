@@ -41,7 +41,7 @@
 (def *throwables (atom #{}))
 
 (defn debug-error [^Throwable throwable]
-  (when-not (contains? @*throwables throwable)
+  (when-not (or (nil? debug/vm) (contains? @*throwables throwable))
     (swap! *throwables conj throwable)
     (let [thread (Thread/currentThread)]
      @(future

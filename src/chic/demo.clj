@@ -71,7 +71,6 @@
      [:stretch 1 (ui/gap 0 10)])))
 
 (defn basic-view []
-  (cui/dyncomp (layout-view))
   (ui/dynamic
     ctx [{:keys [font-ui fill-text]} ctx
          {:keys [selected-tab]} @*state]
