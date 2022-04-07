@@ -69,6 +69,40 @@
                (let [~@bindings]
                  (inputs-fn# ~@syms)))))))))
 
+(defn -memoize-last-1arg [ctor]
+  (let [*cache (volatile! nil)]
+    (fn [args']
+      (or
+       (when-some [cache ^"[Ljava.lang.Object;" @*cache]
+         (let [args (aget cache 0)
+               value (aget cache 1)]
+           (if (loop [i (unchecked-dec-int (count args'))]
+                 (if (< i 0)
+                   false
+                   (let [a1 (nth args i)
+                         a2 (nth args' i)]
+                     (if (if (or (instance? Double a1) (instance? Float a1))
+                           (clojure.lang.Util/equals a1 a2)
+                           (clojure.lang.Util/identical a1 a2))
+                       (recur (unchecked-dec-int i))
+                       true))))
+             (when (instance? AutoCloseable value)
+               (.close ^AutoCloseable value))
+             value)))
+       (let [value' (ctor args')]
+         (vreset! *cache (doto ^"[Ljava.lang.Object;" (make-array Object 2)
+                           (aset 0 args')
+                           (aset 1 value')))
+         value')))))
+
+(defmacro dynamic [ctx-sym bindings & body]
+  (let [syms (ui/bindings->syms bindings)]
+    `(let [inputs-fn# (-memoize-last-1arg (fn [[~@syms]] ~@body))]
+       (ui/contextual
+        (fn [~ctx-sym]
+          (let [~@bindings]
+            (inputs-fn# [~@syms])))))))
+
 (defn assert-good-cs [cs]
   (when (or (instance? Point cs) (instance? IPoint cs)
             ;; (neg? (:right cs))
@@ -78,8 +112,6 @@
             (neg? (:width cs)) (neg? (:height cs)))
     (throw (doto (ex-info "bad cs" {:cs cs}) pp/pprint)))
   cs)
-;; (remove-method print-method IPoint)
-;; (hui/doui (prn 4))
 
 (defn offset-lt [rect dx dy]
   (assert-good-cs rect)
@@ -229,11 +261,12 @@
       (event-propagate event child child-rect child-rect))
      ([event child child-rect offset]
       (when (and child child-rect)
-        (let [rect (:chic.ui/component-rect event)
-              rect' (IRect/makeXYWH (+ (:x rect) (:x offset))
-                                    (+ (:y rect) (:y offset))
-                                    (:width child-rect) (:height child-rect))]
-          (huip/-event child (assoc event :chic.ui/component-rect rect'))))))))
+        (huip/-event child
+                     (when-let [rect (:chic.ui/component-rect event)]
+                       (assoc event :chic.ui/component-rect
+                              (IRect/makeXYWH (+ (:x rect) (:x offset))
+                                              (+ (:y rect) (:y offset))
+                                              (:width child-rect) (:height child-rect))))))))))
 
 (defn event-propagate [event child child-rect]
   (when (and child child-rect)
@@ -367,18 +400,22 @@
   (dyncomp
    (->MouseMoveListener on-event child)))
 
-(deftype+ BeforeDrawHook [on-draw child]
+(deftype+ DrawHook [on-draw after-draw child]
   IComponent
   (-measure [_ ctx cs] (measure-child child ctx cs))
   (-draw [_ ctx cs ^Canvas canvas]
          (on-draw ctx cs canvas)
-         (draw-child child ctx cs canvas))
+         (draw-child child ctx cs canvas)
+         (after-draw ctx cs canvas))
   (-event [_ event] (huip/-event child event))
   AutoCloseable
   (close [_] (ui/child-close child)))
 
-(defn on-draw [on-draw child]
-  (->BeforeDrawHook on-draw child))
+(defn on-draw
+  ([on-draw child]
+   (->DrawHook on-draw (fn [_ _ _]) child))
+  ([on-draw after-draw child]
+   (->DrawHook on-draw after-draw child)))
 
 (deftype+ ShadowRect [dx dy blur spread colour child]
   IComponent
@@ -458,7 +495,7 @@
   (-draw [_ ctx cs ^Canvas canvas]
          (draw-child child (xf ctx) cs canvas))
 
-  (-event [_ event] (huip/-event child event))
+  (-event [_ event] (huip/-event child (xf event)))
 
   AutoCloseable (close [_] (ui/child-close child)))
 
@@ -511,3 +548,38 @@
 
 (defn with-bounds [key child]
   (->WithBounds key child nil))
+
+(deftype+ Lifecycle [on-mount on-close child ^:mut initialised?]
+  IComponent
+  (-measure [_ ctx cs] (huip/-measure child ctx cs))
+
+  (-draw [self ctx cs ^Canvas canvas]
+         (when-not initialised?
+           (when on-mount (on-mount self ctx))
+           (set! initialised? true))
+         (huip/-draw child ctx cs canvas))
+
+  (-event [_ event] (huip/-event child event))
+
+  AutoCloseable
+  (close [self] (when on-close (on-close self)) (ui/child-close child)))
+
+(defn lifecycle [on-mount on-close child]
+  (->Lifecycle on-mount on-close child false))
+
+(deftype+ ProfileDraw [title child]
+  IComponent
+  (-measure [_ ctx cs]
+            (profile/measure (str title " : measure")
+                             (huip/-measure child ctx cs)))
+
+  (-draw [self ctx cs ^Canvas canvas]
+         (profile/measure title (huip/-draw child ctx cs canvas)))
+
+  (-event [_ event] (huip/-event child event))
+
+  AutoCloseable
+  (close [self] (ui/child-close child)))
+
+(defn profile [nam child]
+  (->ProfileDraw nam child))

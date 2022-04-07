@@ -1,6 +1,8 @@
 (ns chic.text-editor.element
   (:require
+   [io.github.humbleui.profile :as profile]
    [chic.focus :as focus]
+   [io.github.humbleui.paint :as huipaint]
    [chic.text-editor :as text-editor :refer [PTextEditor_Element]]
    [chic.ui.layout :as cuilay]
    [chic.ui.focusable :as focusable]
@@ -11,8 +13,8 @@
    [chic.ui :as cui])
   (:import
    (chic.text_editor TextEditor)
-   [io.github.humbleui.skija Canvas Paint TextLine]
-   [io.github.humbleui.types IPoint IRect]
+   [io.github.humbleui.skija Canvas Paint TextLine ColorFilter BlendMode ColorMatrix InversionMode FontMetrics]
+   [io.github.humbleui.types IPoint IRect Rect RRect]
    [java.lang AutoCloseable]))
 
 (defn editor-on-key-down [self focus-manager evt]
@@ -49,199 +51,123 @@
 
   #!
   )
-;; TODO a text span that can display a cursor within it without causing text wobbling (see EOF)
-#_#_#_
-(deftype+ TextSpan [^String text ^Font font ^Paint paint ^TextLine line ^FontMetrics metrics]
-  IComponent
-  (-measure [_ ctx cs]
-            (IPoint.
-             (Math/ceil (.getWidth line))
-             (Math/ceil (.getCapHeight metrics))))
 
-  (-draw [_ ctx cs ^Canvas canvas]
-         (.drawTextLine canvas line 0 (Math/ceil (.getCapHeight metrics)) paint))
+(defn text-run-segment []
+  (cui/updating-ctx
+   (let [*cache-label (volatile! nil)
+         *cache-input (volatile! nil)]
+     (fn [ctx]
+       (let [{:keys [font-code fill-text segment-content]} ctx
+             input [font-code fill-text segment-content]]
+         (assoc ctx :ui-label
+                (or (if (= input @*cache-input)
+                      @*cache-label
+                      (do (vreset! *cache-input input) nil))
+                    (do (ui/child-close @*cache-label)
+                        (vreset! *cache-label (ui/label (if (== 0 (count segment-content))
+                                                          " "
+                                                          segment-content)
+                                                        font-code fill-text))))))))
+   (cui/on-event
+    (fn [event]
+      (when-let [x (:chic.text-editor/event.x->char.x event)]
+        (when (= (:line-id event) (:target-line-id event))
+          (let [textline ^TextLine (:line (:ui-label event))]
+            ((:chic.text-editor/event.x->char.callback event)
+             {:local-idx (if (:insert-mode? (::text-editor/state event))
+                           (.getOffsetAtCoord textline x)
+                           (.getLeftOffsetAtCoord textline x))}))))
+      false)
+    (let [top-padding 3
+          bottom-padding 5
+          base (fn [] (cuilay/padding
+                       0 top-padding 0 bottom-padding
+                       (ui/contextual (fn [ctx] (:ui-label ctx)))))]
+      (cui/dynamic
+       ctx [cursor-id (when (= (:line-id ctx)
+                               (:line-id (nth (:cursors (::text-editor/state ctx)) 0)))
+                        0)]
+       (if cursor-id
+         (cui/updating-ctx
+          (fn [ctx]
+            (let [textline ^TextLine (:line (:ui-label ctx))
+                  cursor-idx (max 0 (:idx (get (:cursors (::text-editor/state ctx)) cursor-id)))]
+              (assoc ctx
+                     :char-left (.getCoordAtOffset textline cursor-idx)
+                     :char-right (.getCoordAtOffset textline (unchecked-inc-int cursor-idx)))))
+          (let [normal-background (huipaint/fill 0xFFD07040)
+                insert-background (huipaint/fill 0xFF4070D0)
+                insert-foreground (huipaint/fill 0x70000000)
+                normal-foreground (huipaint/fill 0xFFFFFFFF)]
+            (cuilay/stack
+             (base)
+             (let [*cursor-x (volatile! 0)]
+               (cui/on-event
+                (fn [event]
+                  (when (= cursor-id (:chic.text-editor/event.cursor->x.id event))
+                    ((:chic.text-editor/event.cursor->x.callback event)
+                     @*cursor-x))
+                  false)
+                (cui/on-draw
+                 (fn [{:keys [ui-label char-left char-right]
+                       {:keys [insert-mode?]} ::text-editor/state} cs ^Canvas canvas]
+                   (let [layer (.save canvas)]
+                     (if insert-mode?
+                       (do (.drawRect canvas (Rect/makeLTRB char-left 0 (unchecked-add-int 2 char-left) (:height cs))
+                                      insert-background)
+                           (vreset! *cursor-x char-left))
+                       (do (.drawRRect canvas (RRect/makeLTRB char-left 0 char-right (:height cs) 2)
+                                       normal-background)
+                           (vreset! *cursor-x (unchecked-int (/ (unchecked-add-int char-left char-right) 2)))))
+                     (.clipRect canvas (if insert-mode?
+                                         (Rect/makeLTRB char-left 0 (unchecked-add-int 2 char-left) (:height cs))
+                                         (RRect/makeLTRB char-left 0 char-right (:height cs) 2)))
+                     (.drawTextLine
+                      canvas (:line ui-label) 0
+                      (unchecked-add-int top-padding (Math/ceil (.getCapHeight ^FontMetrics (:metrics ui-label))))
+                      (if insert-mode?
+                        insert-foreground
+                        normal-foreground))
+                     (.restoreToCount canvas layer)))
+                 (ui/gap 0 0)))))))
+         (base)))))))
 
-  (-event [_ event])
-
-  AutoCloseable
-  (close [_]
-         #_(.close line))) ; TODO
-
-(def ^:private ^Shaper shaper (Shaper/makeShapeDontWrapOrReorder))
-
-(defn text-span [^String text ^Font font ^Paint paint & features]
-  (let [opts (reduce #(.withFeatures ^ShapingOptions %1 ^String %2) ShapingOptions/DEFAULT features)
-        line (.shapeLine shaper text font ^ShapingOptions opts)]
-    (->TextSpan text font paint line (.getMetrics ^Font font))))
-
-(deftype+ NonTextLineSegment [child ^:mut size ^:mut child-rect]
-  IComponent
-  (-measure [_ ctx cs]
-            (huip/-measure child ctx cs))
-
-  (-draw [_ ctx cs ^Canvas canvas]
-         (set! size cs)
-         (set! child-rect (IRect/makeXYWH 0 0 (:width cs) (:height cs)))
-         (huip/-draw child ctx cs canvas))
-
-  (-event [_ event]
-          (ui/event-propagate event child child-rect))
-
-  AutoCloseable
-  (close [_]
-         (ui/child-close child)))
-
-(deftype+ TextLineSegment [child ^:mut size]
-  IComponent
-  (-measure [_ ctx cs]
-            (huip/-measure child ctx cs))
-
-  (-draw [_ ctx cs ^Canvas canvas]
-         (set! size cs)
-         (huip/-draw child ctx cs canvas))
-
-  (-event [_ event]
-          (ui/event-propagate event child size))
-
-  AutoCloseable
-  (close [_]
-         (ui/child-close child)))
-
-(defn text-line-segment [child]
-  (->TextLineSegment child nil))
-
-(deftype+ FullTextLine [children ^:mut child-rects]
-  IComponent
-  (-measure [_ ctx cs]
-            ;; should not overflow horizontally normally
-            ;; so -measure should return the real size within the cs
-            ;; accounting for text wrapping
-            (reduce
-             (fn [{:keys [width height]} child]
-               (let [child-size (huip/-measure child ctx cs)]
-                 (IPoint. (+ width (:width child-size)) (max height (:height child-size)))))
-             (IPoint. 0 0)
-             (keep #(nth % 2) children)))
-
-  (-draw [_ ctx cs ^Canvas canvas]
-         (let [known (for [[mode _ child] children]
-                       (when (= :hug mode)
-                         (huip/-measure child ctx cs)))
-               space (- (:width cs) (transduce (keep :width) + 0 known))
-               stretch (transduce (keep (fn [[mode value _]] (when (= :stretch mode) value))) + 0 children)
-               layer (.save canvas)]
-           (try
-             (loop [width 0
-                    rects []
-                    known known
-                    children children]
-               (if-some [[mode value child] (first children)]
-                 (let [child-size (case mode
-                                    :hug (first known)
-                                    :stretch (IPoint. (-> space (/ stretch) (* value) (math/round)) (:height cs)))]
-                   (when child
-                     (huip/-draw child ctx (cui/rect-with-wh cs (assoc child-size :height (:height cs))) canvas))
-                   (.translate canvas (:width child-size) 0)
-                   (recur
-                    (+ width (long (:width child-size)))
-                    (conj rects (IRect/makeXYWH width 0 (:width child-size) (:height cs)))
-                    (next known)
-                    (next children)))
-                 (set! child-rects rects)))
-             (.restoreToCount canvas layer))))
-
-  (-event [_ event]
-          (reduce
-           (fn [acc [[_ _ child] rect]]
-             (hui/eager-or acc (ui/event-propagate event child rect) false))
-           false
-           (hui/zip children child-rects)))
-
-  AutoCloseable
-  (close [_]
-         (doseq [[_ _ child] children]
-           (ui/child-close child))))
-
-(defn cursor-segment [{:keys [insert-mode?]} {:keys [font-code fill-text vpadding] :as ctx} s cursor-idx cursor-id]
-  (let [label (if insert-mode?
-                (ui/label s font-code (doto (Paint.) (.setColor (unchecked-int 0xFFFFFFFF))))
-                (ui/label s font-code (doto (Paint.) (.setColor (unchecked-int 0xFFFFFFFF)))))]
-    {:start-idx cursor-idx
-     :cursor-id cursor-id
-     :closest-char-fn (fn [x]
-                        {:local-idx 0
-                         :right-side? (< (/ (.getWidth ^TextLine (:line label)) 2) x)})
-     :ui
-     (text-line-segment
-      (if insert-mode?
-        (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFF4070D0)))
-                 (cuilay/padding
-                  0 vpadding
-                  label))
-        (ui/clip-rrect
-         2
-         (ui/fill (doto (Paint.) (.setColor (unchecked-int 0xFFD07040)))
-                  (cuilay/padding
-                   0 vpadding
-                   label)))))}))
-
-(defn text-run-segment [{:keys [font-code fill-text vpadding]} content start-idx]
-  (let [label (ui/label content font-code fill-text)]
-    {:start-idx start-idx
-     :closest-char-fn (fn [x]
-                        (let [guessed-idx (math/round (* (unchecked-dec-int (count content))
-                                                         (min 1 (/ x (.getWidth ^TextLine (:line label))))))]
-                          {:local-idx guessed-idx
-                           :right-side? false}))
-     :ui
-     (text-line-segment
-      (cuilay/padding
-       0 vpadding
-       label))}))
-
-(defn full-text-line [self {:keys [font-code fill-text vpadding] :as ctx} line-id]
-  (let [sm @(:state self)
-        line (get-in sm [:lines-by-id line-id])
-        content (:content line)
-        cursor (first (:cursors sm))
-        cursor-id 0
-        segments (if (= line-id (:line-id cursor))
-                   (let [cursor-idx (:idx cursor)]
-                     [(text-run-segment ctx (cond-> content (< cursor-idx (count content))
-                                              (subs 0 cursor-idx)) 0)
-                      (cursor-segment sm ctx (str (nth content cursor-idx \space)) cursor-idx cursor-id)
-                      (text-run-segment ctx (subs content (min (inc cursor-idx) (count content)))
-                                        (unchecked-dec-int (count content)))])
-                   [(text-run-segment ctx content 0)])]
-    (swap! (:state self) assoc-in [:lines-by-id line-id :ui-segments]
-           segments)
-    (->FullTextLine
-     (-> (mapv (fn [s] [:hug nil (:ui s)]) segments)
-         #_(conj [:stretch 1 (ui/gap 0 0)]))
-     nil)))
+(defn full-text-line [line-id]
+  (cui/updating-ctx
+   (fn [ctx] (assoc ctx :line-id line-id
+                    :segment-content
+                    (:content (get (:lines-by-id (::text-editor/state ctx))
+                                   line-id))))
+     (cuilay/row
+      (cui/dyncomp (text-run-segment))
+      nil)))
 
 (extend-type TextEditor
   PTextEditor_Element
   (element [{:keys [state focus-node] :as self}]
-    (focusable/make
-     {:focus-node focus-node}
-     (ui/dynamic
-      ctx [scale (:scale ctx)
-           font-code (:font-code ctx)
-           state' @state
-           focus-manager (:focus-manager ctx)]
-      (let [scale scale
-            font-code font-code
-            {:keys [line-order]} state'
-            leading (-> font-code .getMetrics .getCapHeight Math/ceil (/ scale))
-            fill-text (doto (Paint.) (.setColor (unchecked-int 0xFF000000)))
-            vpadding (/ leading 5)
-            ctx {:fill-text fill-text :font-code font-code :vpadding vpadding}]
-        (ui/on-key-down
-         #(editor-on-key-down self focus-manager %)
-         (cuilay/column
-          (for [line-id line-order]
-            (full-text-line self ctx line-id)))))))))
+    (cui/updating-ctx
+     (fn [ctx]
+       (assoc ctx ::text-editor/state @state))
+     (focusable/make
+      {:focus-node focus-node}
+      (cui/dynamic
+       ctx [{:keys [line-order]} (::text-editor/state ctx)
+            focus-manager (:focus-manager ctx)
+            window (:chic/current-window ctx)]
+       (let [new-lines (transient (:lines-by-id @state))
+             ui-lines (mapv (fn [line-id]
+                              (let [ui (cui/dyncomp (full-text-line line-id))]
+                                (assoc! new-lines line-id
+                                        (assoc (get new-lines line-id)
+                                               :ui ui
+                                               :window window))
+                                [:hug nil ui]))
+                            line-order)]
+         (swap! state assoc :lines-by-id (persistent! new-lines))
+         (ui/on-key-down
+          #(editor-on-key-down self focus-manager %)
+          (cuilay/column
+           (eduction ui-lines)))))))))
 
 ;; problem with curren implementation: letters move around when moving the cursor
 ;; this is because Label allocates pixel space with Math/ceil to ensure it fits

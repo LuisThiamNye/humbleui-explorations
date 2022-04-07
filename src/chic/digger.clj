@@ -78,7 +78,7 @@
 
 (defn digger-tap-handler [x]
   (close-session *state)
-  (reset! *state (new-session (new-inspector x))))
+  (reset! *state @(new-session x)))
 
 (add-tap #'digger-tap-handler)
 

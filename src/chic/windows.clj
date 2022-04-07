@@ -85,46 +85,48 @@
 (defn window-app-rect [window-obj]
   (cui/rect-with-wh (huiwin/content-rect window-obj)))
 
-(defn on-event-handler [{:keys [*app-root window-obj *ctx] :as win} event]
+(defn send-event [{:keys [window-obj *ctx *app-root]} event]
+  (huip/-event
+   @*app-root (enc/merge @*ctx
+                        (assoc event :chic.ui/component-rect
+                               (window-app-rect window-obj)))))
+
+(defn on-event-handler [{:keys [window-obj *ctx] :as win} event]
   (try
     (profile/reset "event")
     (profile/measure
      "event"
-     (let [app-root @*app-root
-           make-evt (fn [m] (merge @*ctx
-                                   (assoc m :chic.ui/component-rect (window-app-rect window-obj))))
-           changed? (condp instance? event
+     (let [changed? (condp instance? event
                       EventMouseMove
                       (let [pos (IPoint. (.getX ^EventMouseMove event) (.getY ^EventMouseMove event))
-                            event (make-evt {:hui/event :hui/mouse-move
-                                             :chic.ui/mouse-win-pos pos
-                                                             ;; :hui.event/pos pos
-                                             })]
+                            event {:hui/event :hui/mouse-move
+                                   :chic.ui/mouse-win-pos pos
+                                   ;; :hui.event/pos pos
+                                   }]
                         (swap! *ctx assoc :chic.ui/mouse-win-pos pos)
-                        (ui/event app-root event))
+                        (send-event win event))
 
                       EventMouseButton
-                      (let [event (make-evt
-                                   {:hui/event :hui/mouse-button
-                                    :event event
-                                    :hui.event.mouse-button/is-pressed (.isPressed ^EventMouseButton event)})]
-                        (ui/event app-root event))
+                      (let [event {:hui/event :hui/mouse-button
+                                   :event event
+                                   :hui.event.mouse-button/is-pressed (.isPressed ^EventMouseButton event)}]
+                        (send-event win event))
 
                       EventMouseScroll
-                      (ui/event app-root
-                                (make-evt {:hui/event :hui/mouse-scroll
-                                           :hui.event.mouse-scroll/dx (.getDeltaX ^EventMouseScroll event)
-                                           :hui.event.mouse-scroll/dy (.getDeltaY ^EventMouseScroll event)}))
+                      (send-event win
+                                {:hui/event :hui/mouse-scroll
+                                 :hui.event.mouse-scroll/dx (.getDeltaX ^EventMouseScroll event)
+                                 :hui.event.mouse-scroll/dy (.getDeltaY ^EventMouseScroll event)})
 
                       EventWindowFocusOut
                       (do ;;(vreset! *pressed-keys #{})
                         false)
 
                       EventKey
-                      (ui/event app-root
-                                (make-evt {:hui/event (if (.isPressed ^EventKey event) :hui/key-down :hui/key-up)
-                                           :hui.event.key/key (.getName (.getKey ^EventKey event))
-                                           :eventkey event}))
+                      (send-event win
+                                {:hui/event (if (.isPressed ^EventKey event) :hui/key-down :hui/key-up)
+                                 :hui.event.key/key (.getName (.getKey ^EventKey event))
+                                 :eventkey event})
 
                       EventWindowResize
                       true
@@ -210,6 +212,7 @@
     (vswap! (:*profiling w) assoc :latest-paint-duration
             (unchecked-subtract (System/nanoTime) (:paint-start-time @(:*profiling w))))
     #_(enc/after-timeout 1000 (request-frame w))
+    #_(request-frame w)
     #_(let [{:keys [paint-start-time event-triggers-change-time paint-done-time]} @(:*profiling w)]
         (chic.debug/println-main
          "(ms)"

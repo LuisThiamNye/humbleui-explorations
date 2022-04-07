@@ -178,7 +178,11 @@
    (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
   ;; (debug/attach-vm!)
   ;; (debugger/install-debug-ctx!)
-  (hui/start #(make-main-window)))
+  (hui/start (fn []
+                (.setContextClassLoader
+                 (Thread/currentThread)
+                 (.getClassLoader (Class/forName "clojure.lang.Compiler")))
+                (make-main-window))))
 
 (comment
   (do

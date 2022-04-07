@@ -227,31 +227,31 @@
 (defn inspector [obj]
   (cui.error/bound-errors
    (ui/dynamic
-     ctx [{:keys [fill-text font-ui]} ctx
-          _ @#'get-inspector-views]
-     (let [views (conj (get-inspector-views obj)
-                       {:title "Obj"
-                        :id :java-object
-                        :ui-fn (fn [obj] (cui/dyncomp (class-view obj)))})
-           views (cond-> views (meta obj)
-                         (conj {:title "Meta"
-                                :id :metadata
-                                :ui-fn #(inspector (meta %))}))
-           *state (atom {:selected-view (:id (first views))})]
-       (ui/dynamic
-         ctx [{:keys [selected-view]} @*state]
-         (cuilay/column
-          (ui/fill (huipaint/fill 0xFFd9d9d9)
-                   (cuilay/hscroll
-                    (cuilay/padding
-                     5 (ui/label (str obj) font-ui fill-text))))
-          (ui/fill
-           (huipaint/fill 0xFFFFFFFF)
-           (cond
-             (nil? obj)
-             (cuilay/padding
-              10 (ui/label "nil" font-ui fill-text))
-             :else
+    ctx [{:keys [fill-text font-ui]} ctx
+         _ @#'get-inspector-views]
+     (cuilay/column
+      (ui/fill (huipaint/fill 0xFFd9d9d9)
+               (cuilay/hscroll
+                (cuilay/padding
+                 5 (ui/label (str obj) font-ui fill-text))))
+      (ui/fill
+       (huipaint/fill 0xFFFFFFFF)
+       (cond
+         (nil? obj)
+         (cuilay/padding
+          10 (ui/label "nil" font-ui fill-text))
+         :else
+         (let [views (conj (get-inspector-views obj)
+                           {:title "Obj"
+                            :id :java-object
+                            :ui-fn (fn [obj] (cui/dyncomp (class-view obj)))})
+               views (cond-> views (meta obj)
+                             (conj {:title "Meta"
+                                    :id :metadata
+                                    :ui-fn #(inspector (meta %))}))
+               *state (atom {:selected-view (:id (first views))})]
+           (ui/dynamic
+             _ [{:keys [selected-view]} @*state]
              (cuilay/column
               (cuilay/hscroll
                (cuilay/row

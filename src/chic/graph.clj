@@ -14,7 +14,7 @@
    [io.github.humbleui.ui :as ui]
    [taoensso.encore :as enc])
   (:import
-   [io.github.humbleui.skija Paint Shader Canvas]
+   [io.github.humbleui.skija Paint Shader Canvas PaintMode]
    [io.github.humbleui.types IPoint Point Rect]))
 
 (defn vadd [a b] (Point. (unchecked-add (:x a) (:x b)) (unchecked-add (:y a) (:y b))))
@@ -173,7 +173,7 @@
                               (catch Throwable e
                                 (println (get nodes id) (get nodes connected-id))
                                 (throw e))))
-         stroke (doto (Paint.) (.setStrokeWidth (if secondary? 1 1.5)))
+         stroke (doto (Paint.) (.setMode PaintMode/STROKE) (.setStrokeWidth (if secondary? 1 1.5)))
          colours (int-array 2 (if secondary?
                                 [(unchecked-int 0x400047ff)
                                  (unchecked-int 0x40ff9900)]
@@ -230,17 +230,20 @@
                      (huipaint/fill 0xa0FFFFFF)
                      (cuilay/height
                       (* 2 radius)
-                      (ui/label (:label node) font-ui fill-text))))]
+                      (ui/label (:label node) font-ui fill-text))))
+         *child-size (volatile! nil)]
      (cuilay/halign
       0 (cuilay/valign
          0 (ui/contextual
             (fn [ctx]
+              (when (nil? @*child-size)
+                (vreset! *child-size (cui/measure-child child ctx (:chic.ui/component-rect ctx))))
               (let [container-bounds (:container-bounds ctx)
                     {{:keys [x y]} :position} (get (:nodes (::draw-state ctx)) id)
                     rhs-offset (unchecked-add padding x)
-                    {child-width :width
-                     child-height :height} (cui/measure-child child ctx (:chic.ui/component-rect ctx))
                     container-width (:width container-bounds)
+                    {child-width :width
+                     child-height :height} @*child-size
                     xoffset (min (if (<= (unchecked-add rhs-offset child-width) container-width)
                                    (max rhs-offset 0)
                                    (max (unchecked-subtract (unchecked-subtract x child-width) 2) 0))

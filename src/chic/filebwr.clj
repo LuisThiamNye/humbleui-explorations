@@ -38,8 +38,10 @@
            5 5
            (if (< 100000 (count content))
              (ui/label "File too big" font-ui fill-text)
-             (cui/dyncomp
-              (text-editor/element (text-editor.core/make {:content content :pos 0})))))))
+             (cuilay/vscrollbar
+              (cuilay/vscroll
+               (cui/dyncomp
+                (text-editor/element (text-editor.core/make {:content content :pos 0})))))))))
       (ui/gap 0 0)))))
 
 (declare file-tree-children)
