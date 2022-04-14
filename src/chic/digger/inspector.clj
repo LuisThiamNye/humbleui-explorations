@@ -161,11 +161,11 @@
              40 (cuilay/halign
                  1 (ui/label (str idx) font-code fill-text)))
             (ui/gap 5 0)
-            (ui/label (str item) font-code fill-text)))))))
+            (cui/trimmed-label (str item) font-code fill-text)))))))
      obj))))
 
 (defn dictionary-view [obj]
-  (ui/dynamic
+  (cui/dynamic
    ctx [{:keys [fill-text font-code]} ctx]
    (cuilay/column
     (cuilay/row
@@ -174,16 +174,19 @@
      [:stretch 1 (ui/clip (ui/label "Value" font-code fill-text))])
     (let [item-ui
           (fn [item]
-            (cui/clickable
-             (uievt/on-primary-down
-              (fn [evt] (cui/emit evt [[::inspect-result item]])))
-             (ui/dynamic
-              ctx [{:hui/keys [hovered?]} ctx]
-              (ui/fill
-               (huipaint/fill (if hovered? 0x10000000
-                                  0x00000000))
-               (ui/clip (cuilay/padding
-                         0 3 (ui/label (str (or item "nil")) font-code fill-text)))))))]
+            (let [repr (str (or item "nil"))
+                  repr (cond-> repr (< 500 (count repr))
+                               (subs 0 500))]
+              (cui/clickable
+               (uievt/on-primary-down
+                (fn [evt] (cui/emit evt [[::inspect-result item]])))
+               (ui/dynamic
+                ctx [{:hui/keys [hovered?]} ctx]
+                (ui/fill
+                 (huipaint/fill (if hovered? 0x10000000
+                                    0x00000000))
+                 (ui/clip (cuilay/padding
+                           0 3 (cui/trimmed-label repr font-code fill-text))))))))]
       (map
        (fn [[k v]]
          (cuilay/row
@@ -229,47 +232,50 @@
    (ui/dynamic
     ctx [{:keys [fill-text font-ui]} ctx
          _ @#'get-inspector-views]
-     (cuilay/column
-      (ui/fill (huipaint/fill 0xFFd9d9d9)
-               (cuilay/hscroll
-                (cuilay/padding
-                 5 (ui/label (str obj) font-ui fill-text))))
-      (ui/fill
-       (huipaint/fill 0xFFFFFFFF)
-       (cond
-         (nil? obj)
-         (cuilay/padding
-          10 (ui/label "nil" font-ui fill-text))
-         :else
-         (let [views (conj (get-inspector-views obj)
-                           {:title "Obj"
-                            :id :java-object
-                            :ui-fn (fn [obj] (cui/dyncomp (class-view obj)))})
-               views (cond-> views (meta obj)
-                             (conj {:title "Meta"
-                                    :id :metadata
-                                    :ui-fn #(inspector (meta %))}))
-               *state (atom {:selected-view (:id (first views))})]
-           (ui/dynamic
-             _ [{:keys [selected-view]} @*state]
-             (cuilay/column
+    (cuilay/column
+     (ui/fill (huipaint/fill 0xFFd9d9d9)
               (cuilay/hscroll
-               (cuilay/row
-                (for [v views]
-                  (cui/clickable
-                   (uievt/on-primary-down
-                    (fn [_] (swap! *state assoc :selected-view (:id v))))
-                   (cuilay/padding
-                    2 (ui/clip-rrect
-                       5 (ui/fill
-                          (huipaint/fill (if (= (:id v) selected-view)
-                                           0x6070b0c0
-                                           0x10004050))
-                          (cuilay/padding
-                           4 (ui/label (:title v) font-ui fill-text)))))))))
-              (cuilay/vscroll
-               (some (fn [v] (when (= selected-view (:id v))
-                               ((:ui-fn v) obj))) views)))))))))))
+               (cuilay/padding
+                5 (cui/label (let [repr (str obj)]
+                               (cond-> repr (< 500 (count repr))
+                                       (subs 0 500)))
+                             font-ui fill-text))))
+     (ui/fill
+      (huipaint/fill 0xFFFFFFFF)
+      (cond
+        (nil? obj)
+        (cuilay/padding
+         10 (ui/label "nil" font-ui fill-text))
+        :else
+        (let [views (conj (get-inspector-views obj)
+                          {:title "Obj"
+                           :id :java-object
+                           :ui-fn (fn [obj] (cui/dyncomp (class-view obj)))})
+              views (cond-> views (meta obj)
+                            (conj {:title "Meta"
+                                   :id :metadata
+                                   :ui-fn #(inspector (meta %))}))
+              *state (atom {:selected-view (:id (first views))})]
+          (ui/dynamic
+           _ [{:keys [selected-view]} @*state]
+           (cuilay/column
+            (cuilay/hscroll
+             (cuilay/row
+              (for [v views]
+                (cui/clickable
+                 (uievt/on-primary-down
+                  (fn [_] (swap! *state assoc :selected-view (:id v))))
+                 (cuilay/padding
+                  2 (ui/clip-rrect
+                     5 (ui/fill
+                        (huipaint/fill (if (= (:id v) selected-view)
+                                         0x6070b0c0
+                                         0x10004050))
+                        (cuilay/padding
+                         4 (ui/label (:title v) font-ui fill-text)))))))))
+            (cuilay/vscroll
+             (some (fn [v] (when (= selected-view (:id v))
+                             ((:ui-fn v) obj))) views)))))))))))
 
 (comment
 

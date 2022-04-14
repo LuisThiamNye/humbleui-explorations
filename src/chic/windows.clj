@@ -19,7 +19,7 @@
    [io.github.humbleui.window :as huiwin])
   (:import
    [io.github.humbleui.jwm EventMouseButton EventMouseMove EventMouseScroll
-    EventKey EventWindowFocusOut App Window EventWindowResize]
+    EventKey EventWindowFocusOut App Window EventWindowResize EventTextInput]
    [io.github.humbleui.skija Canvas Font Paint]
    [io.github.humbleui.types IPoint]))
 
@@ -128,10 +128,16 @@
                                  :hui.event.key/key (.getName (.getKey ^EventKey event))
                                  :eventkey event})
 
+                      EventTextInput
+                      (do
+                        (send-event win
+                                   {:hui/event :hui/text-input
+                                    :hui.event.text-input/text (.getText ^EventTextInput event)}))
+
                       EventWindowResize
                       true
 
-                      nil)]
+                      (do #_(println "Other event:" (type event)) nil))]
        (when changed?
          (vswap! (:*profiling win) assoc :event-triggers-change-time (System/nanoTime))
          (huiwin/request-frame window-obj))))

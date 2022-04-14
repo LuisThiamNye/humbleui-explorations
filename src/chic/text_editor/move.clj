@@ -7,8 +7,7 @@
    [chic.text-editor.element]
    [chic.text-editor.line :as line])
   (:import
-   (chic.text_editor TextEditor)
-   (chic.text_editor.element TextLineSegment)))
+   (chic.text_editor TextEditor)))
 
 (defn move-up-or-down [*state up?]
   (let [sm @*state]

@@ -102,14 +102,20 @@
            [:stretch 1
             (ui/gap 0 0)]
            (cui/clickable
-            (uievt/on-primary-down (fn [_](debugger/show-error-window)))
+            (uievt/on-primary-down
+             (fn [_] (cui/refresh-all-dyncomps!)))
+            (ui/fill (huipaint/fill 0x11000000)
+                     (cuilay/valign
+                      0.5 (cuilay/padding 20 0 (ui/label "Refresh" font-ui fill-text)))))
+           (cui/clickable
+            (uievt/on-primary-down (fn [_] (debugger/show-error-window)))
             (ui/dynamic
-              _ctx [error-count (count (:error-stack @debugger/*state))]
-              (ui/fill (huipaint/fill (if (pos? error-count)
-                                        0x20503000
-                                        0x09000000))
-                       (cuilay/valign
-                        0.5 (cuilay/padding 10 0 (ui/label (str error-count " E") font-ui fill-text))))))
+             _ctx [error-count (count (:error-stack @debugger/*state))]
+             (ui/fill (huipaint/fill (if (pos? error-count)
+                                       0x20503000
+                                       0x09000000))
+                      (cuilay/valign
+                       0.5 (cuilay/padding 10 0 (ui/label (str error-count " E") font-ui fill-text))))))
            (ui/contextual
             (fn [{:keys [:chic.profiling/time-since-last-paint :chic/current-window]}]
               (let [{:keys [latest-paint-duration]} @(:*profiling current-window)
@@ -122,11 +128,11 @@
                   150
                   (cuilay/halign
                    1 (cuilay/padding
-                    5 0 (cuilay/valign
-                         0.5 (ui/label (format "%3d fps %6.3f ms"
-                                               (unchecked-int (/ 1000000000 time-since-last-paint))
-                                               millis)
-                                       font-code fill-text)))))))))
+                      5 0 (cuilay/valign
+                           0.5 (ui/label (format "%3d fps %6.3f ms"
+                                                 (unchecked-int (/ 1000000000 time-since-last-paint))
+                                                 millis)
+                                         font-code fill-text)))))))))
            (cui/clickable
             (fn [event]
               (when (:hui.event.mouse-button/is-pressed event)
@@ -168,21 +174,25 @@
    (Thread.
     (fn []
       (spit ".nrepl-port"
-           (:port (nrepl-server/start-server
-                   :port 7888
-                   (if-some [cider-nrepl-handler @*cider-nrepl-handler]
-                     {:handler cider-nrepl-handler}
-                     {})))))))
+            (:port (nrepl-server/start-server
+                    :port 7888
+                    (if-some [cider-nrepl-handler @*cider-nrepl-handler]
+                      {:handler cider-nrepl-handler}
+                      {})))))))
   (.addShutdownHook
    (Runtime/getRuntime)
    (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
   ;; (debug/attach-vm!)
   ;; (debugger/install-debug-ctx!)
-  (hui/start (fn []
-                (.setContextClassLoader
-                 (Thread/currentThread)
-                 (.getClassLoader (Class/forName "clojure.lang.Compiler")))
-                (make-main-window))))
+  (let [class-loader
+        (.getClassLoader (Class/forName "clojure.lang.Compiler"))
+        #_(.getContextClassLoader
+           (Thread/currentThread))]
+    (hui/start (fn []
+                 (.setContextClassLoader
+                  (Thread/currentThread)
+                  class-loader)
+                 (make-main-window)))))
 
 (comment
   (do

@@ -4,6 +4,7 @@
    [chic.text-editor :as text-editor]
    [chic.ui.event :as uievt]
    [chic.text-editor.core :as text-editor.core]
+   [chic.clj-editor.core :as clj-editor.core]
    [chic.ui :as cui]
    [chic.ui.error :as cui.error]
    [chic.ui.icons.material :as maticons]
@@ -38,10 +39,13 @@
            5 5
            (if (< 100000 (count content))
              (ui/label "File too big" font-ui fill-text)
-             (cuilay/vscrollbar
-              (cuilay/vscroll
+             (if (#{"edn" "clj" "cljs" "cljx" "cljd" "cljc" "cljr"} (fs/extension file))
                (cui/dyncomp
-                (text-editor/element (text-editor.core/make {:content content :pos 0})))))))))
+                (clj-editor.core/make {:content content :pos 0}))
+               (cuilay/vscrollbar
+                (cuilay/vscroll
+                 (cui/dyncomp
+                  (text-editor/element (text-editor.core/make {:content content :pos 0}))))))))))
       (ui/gap 0 0)))))
 
 (declare file-tree-children)
@@ -190,10 +194,12 @@
 
 (defn basic-view []
   (cuilay/row
-   [:stretch 1
-    (cuilay/column
-     (cui/dyncomp (file-tree-toolbar))
-     [:stretch 1
-      (cui.error/bound-errors
-       (cui/dyncomp (file-tree-view)))])]
+   [:hug nil
+    (cuilay/width
+     200
+     (cuilay/column
+      (cui/dyncomp (file-tree-toolbar))
+      [:stretch 1
+       (cui.error/bound-errors
+        (cui/dyncomp (file-tree-view)))]))]
    [:stretch 2 (cui/dyncomp (editor-view))]))

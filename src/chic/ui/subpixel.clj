@@ -33,8 +33,8 @@
        (huip/-event child event')))))
 
 (defn row [& children]
-  (cui/dyncomp
-   (cuilay/->Row (cuilay/flatten-container children) nil true)))
+  (ui/gap 5 5)
+  #_(cuilay/row children))
 
 (defrecord SubpixelGap [width height]
   IComponent

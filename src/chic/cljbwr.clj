@@ -63,7 +63,7 @@
                              0x00000000))
             (cuilay/padding
              2 5
-             (ui/label string font-ui (cond-> fill-text
+             (ui/label string font-ui (cond-> ^Paint fill-text
                                         (nil? ns)
                                         (-> .makeClone (doto (.setAlpha (unchecked-int 0x90))))))))]
     (cuilay/column

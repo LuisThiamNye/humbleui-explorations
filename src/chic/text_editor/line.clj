@@ -18,7 +18,7 @@
   (loop [i (unchecked-dec-int idx)
          seen-non-ws? false]
     (cond
-      (and (or (neg? i) (Character/isWhitespace (nth content i)))
+      (and (or (neg? i) (Character/isWhitespace ^Character (nth content i)))
            seen-non-ws?)
       (inc i)
       (neg? i)
@@ -26,7 +26,7 @@
       :else
       (recur (unchecked-dec-int i)
              (or seen-non-ws?
-                 (not (Character/isWhitespace (nth content i))))))))
+                 (not (Character/isWhitespace ^Character (nth content i))))))))
 
 (defn next-end-of-word-idx [{:keys [content] :as line} idx]
   (next-end-of-big-word-idx line idx))

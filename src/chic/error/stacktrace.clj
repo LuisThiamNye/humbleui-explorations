@@ -125,8 +125,8 @@
                 (let [primaryframe (second frames)
                       sym (classname->sym clsname)
                       varmeta (some-> sym resolve meta)
-                      highlighted-line (when varmeta
-                                         (- (:line-number frame) (:line varmeta)))]
+                      highlighted-line (when-let [line (:line varmeta)]
+                                         (- (:line-number frame -1) line))]
                   (recur (conj children
                                (expandable-item
                                 (cuilay/row

@@ -48,6 +48,8 @@
   ;; and just apply the correct characters for each platform
   ;; there is no good reason to mix crlf and lf
   ;; crlf vs lf is just an implementation detail/historical accident that noone should care about
+  (rewrite-clj.node/children
+   (rewrite-clj.parser/parse-string "(x #!x \n  4)"))
 
   #!
   )
