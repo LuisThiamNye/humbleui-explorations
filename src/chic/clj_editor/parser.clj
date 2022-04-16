@@ -138,6 +138,9 @@
       (match-float s)
       (match-ratio s)))
 
+(defn macro?* [cn]
+  (and (< cn (alength macros)) (not (nil? (aget macros cn)))))
+
 (defn read-number* [parser ^CharReader rdr initch]
   (let [sb (doto (StringBuilder.) (.append initch))]
     (loop []
@@ -151,27 +154,23 @@
 
 (defn append-number! [parser parent num]
   (append-new-node! parser parent ::ast/type.number
-                    {::ast/number.string num}))
+                    (ast/number-node num)))
 
 (defn append-autoresolving-kwd!
   ([parser parent nam]
    (append-new-node! parser parent ::ast/type.keyword
-                     {::ast/keyword.auto? true
-                      ::ast/symbol.name nam}))
+                     (ast/keyword-auto-node nam)))
   ([parser parent alias nam]
    (append-new-node! parser parent ::ast/type.keyword
-                     {::ast/symbol.ns alias
-                      ::ast/symbol.name nam})))
+                     (ast/keyword-alias-node alias nam))))
 
 (defn append-keyword! [parser parent namsp nam]
   (append-new-node! parser parent ::ast/type.keyword
-                    {::ast/symbol.ns namsp
-                     ::ast/symbol.name nam}))
+                    (ast/keyword-node namsp nam)))
 
 (defn append-symbol! [parser parent namsp nam]
   (append-new-node! parser parent ::ast/type.symbol
-                    {::ast/symbol.ns namsp
-                     ::ast/symbol.name nam}))
+                    (ast/symbol-node namsp nam)))
 
 (def symbol-re-pattern #"([\D&&[^/]].*/)?(/|[\D&&[^/]][^/]*)")
 
@@ -235,18 +234,31 @@
 
        (append-token! parser parent (pshared/read-token* parser rdr c))))))
 
+(defn read-into [db parent-id line-id start-idx ^Reader rdr]
+  (let [rdr (dtype.char-input/reader->char-reader rdr)
+        line (get (::ast/lines db) line-id)
+        children-after (-> (::ast/nodes db) (get parent-id) (get ::ast/node-children)
+                           (subvec start-idx))
+        line-order (::ast/line-order db)
+        line-idx (util/index-of line-order line-id)
+        line-order-after (-> line-order (subvec line-idx))
+        tdb (ast/transient-db db parent-id)
+        parser (pshared/new-parser tdb #'read* macros disp-macros)]
+    (while (not (or (.eof rdr) (== -1 (.read rdr))))
+      (.unread rdr)
+      (read* parser parent-id rdr))
+    (pshared/persist-node! parser parent)
+    (pshared/persistent-result! parser)))
+
 (defn read-fresh [^Reader rdr]
   (let [rdr (dtype.char-input/reader->char-reader rdr)
-        tdb (ast/new-transient-db)
+        tdb (ast/transient-db (ast/new-db) ::ast/root-node)
         parser (pshared/new-parser tdb #'read* macros disp-macros)]
     (while (not (or (.eof rdr) (== -1 (.read rdr))))
       (.unread rdr)
       (read* parser ::ast/root-node rdr))
     (pshared/persist-node! parser ::ast/root-node)
     (pshared/persistent-result! parser)))
-
-(defn macro?* [cn]
-  (and (< cn (alength macros)) (not (nil? (aget macros cn)))))
 
 (defn terminating-macro?* [cn]
   (case (char cn) (\# \' \%) false (macro?* cn)))
@@ -282,7 +294,8 @@
                                    (or (.endsWith nspart ":")
                                        (identical? \: (.charAt nspart 0))))
                               (.endsWith nampart ":")
-                              (identical? \: (.charAt nampart 0)))
+                              (identical? \: (.charAt nampart 0))
+                              (re-matches #"nil|true|false|(?:\+|-)\d.*" nampart))
                   (symbol nspart
                           nampart))))))))))
 
@@ -299,6 +312,16 @@
    (and
     (= 'hello/there (parse-symbol "hello/there"))
     (= 'there (parse-symbol "there")))
+   (and
+    (nil? (parse-symbol "+5"))
+    (nil? (parse-symbol "ns/+5"))
+    (nil? (parse-symbol "-5"))
+    (nil? (parse-symbol "ns/-5"))
+    (nil? (parse-symbol "true"))
+    (nil? (parse-symbol "ns/true"))
+    (nil? (parse-symbol "false"))
+    (nil? (parse-symbol "nil"))
+    (nil? (parse-symbol "ns/nil")))
    (and
     (= '/ (parse-symbol "/"))
     (= 'ns// (parse-symbol "ns//"))
@@ -347,6 +370,8 @@
     (nil? (parse-symbol "@"))
     (nil? (parse-symbol "\\")))
    (and
+    (= 'a:b:c (parse-symbol "a:b:c"))
+    (= 'a:b/a:c (parse-symbol "a:b/a:c"))
     (nil? (parse-symbol ":a"))
     (nil? (parse-symbol "a:"))
     (nil? (parse-symbol "a:/a"))
@@ -355,4 +380,10 @@
 
 
   #!
+  )
+
+(defn constant? [s]
+  (some? (re-matches #"true|false|nil" s)))
+
+#_(defn parse-keyword->node [s]
   )

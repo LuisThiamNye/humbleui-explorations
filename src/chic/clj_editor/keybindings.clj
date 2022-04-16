@@ -1,154 +1,315 @@
 (ns chic.clj-editor.keybindings
   (:require
+   [clojure.core.match :refer [match]]
+   [chic.util :as util]
+   [clojure.string :as str]
    [chic.ui :as cui]
    [chic.clj-editor.parser :as clj-editor.parser]
    [chic.clj-editor.nav :as clj-editor.nav]
    [chic.clj-editor.ast.string :as ast.string]
+   [taoensso.encore :as enc]
    [clojure.core.match :refer [match]]
    [chic.clj-editor :as clj-editor]
    [chic.clj-editor.ast :as ast]
    [chic.key :as key])
   (:import
-   (io.github.humbleui.jwm EventKey Key KeyModifier MouseButton)
+   (io.github.humbleui.jwm EventKey Key KeyModifier MouseButton Platform)
    (io.github.humbleui.skija Canvas Paint TextLine)
    (java.lang AutoCloseable)))
 
-(defn keydown->insert-nav-effect [^EventKey ek ^Key k]
-  (cond
-    (key/no-modifiers? ek)
-    (cond
-      (identical? Key/RIGHT k)
-      [::move-forwards]
-      (identical? Key/LEFT k)
-      [::move-backwards]
-      (identical? Key/DOWN k)
-      [::move-down]
-      (identical? Key/UP k)
-      [::move-up]
-      (identical? Key/BACKSPACE k)
-      [::delete-backwards]
-      (identical? Key/DELETE k)
-      [::delete-forwards])
-    (key/only-modifier? ek (key/mask KeyModifier/SHIFT))
-    (cond
-      (identical? Key/RIGHT k)
-      [::move-selection-forwards]
-      (identical? Key/LEFT k)
-      [::move-selection-backwards])
-    (key/only-modifier? ek (key/mask KeyModifier/CONTROL))
-    (cond
-      (identical? Key/F k)
-      [::move-forwards]
-      (identical? Key/B k)
-      [::move-backwards]
-      (identical? Key/N k)
-      [::move-down]
-      (identical? Key/P k)
-      [::move-up]
-      (identical? Key/E k)
-      [::move-to-end]
-      (identical? Key/A k)
-      [::move-to-start]
-      (identical? Key/D k)
-      [::delete-forwards]
-      (identical? Key/K k)
-      [::kill]
-      (identical? Key/H k)
-      [::delete-backwards]
-      (identical? Key/W k)
-      [::delete-backwards-word])
-    (key/only-modifier? ek (or (key/mask KeyModifier/MAC_OPTION)
-                               (key/mask KeyModifier/ALT)))
-    (cond
-      (identical? Key/RIGHT k)
-      [::move-forwards-word]
-      (identical? Key/LEFT k)
-      [::move-backwards-word]
-      (identical? Key/BACKSPACE k)
-      [::delete-backwards-word])
-    (key/only-modifier? ek (key/mask KeyModifier/MAC_COMMAND))
-    (cond
-      (identical? Key/A k)
-      [::select-all]
-      (identical? Key/RIGHT k)
-      [::move-to-end]
-      (identical? Key/LEFT k)
-      [::move-to-start]
-      (identical? Key/BACKSPACE k)
-      [::delete-to-start])
-    (key/only-modifier? ek (key/combine (or [KeyModifier/SHIFT KeyModifier/MAC_OPTION]
-                                            [KeyModifier/SHIFT KeyModifier/ALT])))
-    (cond
-      (identical? Key/RIGHT k)
-      [::move-selection-forwards-word]
-      (identical? Key/LEFT k)
-      [::move-selection-backwards-word])
-    (key/only-modifier? ek (key/combine [KeyModifier/SHIFT KeyModifier/MAC_COMMAND]))
-    (cond
-      (identical? Key/RIGHT k)
-      [::move-selection-to-end]
-      (identical? Key/LEFT k)
-      [::move-selection-to-start])))
+#_{:clj-kondo/ignore [:duplicate-case-test-constant]}
+(def named-modifier-map
+  (enc/case-eval (.ordinal Platform/CURRENT)
+    (.ordinal Platform/WINDOWS)
+    {:primary 'control
+     :alt 'alt}
+    (.ordinal Platform/MACOS)
+    {:primary 'mac-command
+     :alt 'mac-option}
+    (.ordinal Platform/X11)
+    {:primary 'control
+     :alt 'alt}))
 
-[::delete-region 'idx1 'idx2]
-[::move-to 'idx2]
-[::select-region 'idx1 'idx2]
-:line-start
-:doc-start
-:line-end
-:doc-end
-:next-word
-:prev-word
-:next
-:prev
-:next-seg
-:prev-seg
+(defn keyspec->jwm-enum [k clsname]
+  {:pre [(some? k)]}
+  (let [s (str/replace
+           (str/upper-case
+            (name (cond-> k
+                    (keyword? k)
+                    (named-modifier-map))))
+           #"-" "_")]
+    (some (fn [jk]
+            (when (= s (str jk)) jk))
+          (.getEnumConstants (Class/forName clsname)))))
+
+(defn keyspec->jwm [k]
+  (keyspec->jwm-enum k (util/compile (.getName Key))))
+
+(defn modspec->jwm [k]
+  (keyspec->jwm-enum k (util/compile (.getName KeyModifier))))
+
+(defn make-keybindings-handler [spec]
+  (letfn [(merge-modspec [mask mods]
+            (reduce (fn [mask ^KeyModifier km]
+                      (+ mask (.-_mask km)))
+                    mask
+                    (eduction (map modspec->jwm)
+                              (when mods
+                                (if (coll? mods)
+                                  mods
+                                  [mods])))))
+          (process [m entry mods]
+            (match entry
+              [:modifiers modspec & children]
+              (reduce #(process %1 %2 (merge-modspec mods modspec))
+                      m children)
+              [:keys & kvs]
+              (assoc m :keymap
+                     (reduce
+                      (fn [m [k effect]]
+                        (update m mods assoc (keyspec->jwm k) effect))
+                      (:keymap m)
+                      (eduction (partition-all 2) kvs)))
+              [:def effect child]
+              (match child
+                [:bindings & bindings]
+                (reduce
+                 (fn [m binding]
+                   (let [modspec (butlast binding)
+                         k (peek binding)]
+                     (process m [:modifiers modspec
+                                 [:keys k effect]]
+                              mods)))
+                 m bindings))
+              [:remap & kvs]
+              (assoc m :effectmap
+                     (reduce
+                      (fn [em [fromeffect effect]]
+                        (assoc em fromeffect effect))
+                      (:effectmap m)
+                      (eduction (partition-all 2) kvs)))))]
+    (let [bm (reduce (fn [m entry]
+                       (process m entry 0))
+                     {:keymap {}
+                      :effectmap {}}
+                     spec)
+          bm (update bm :keymap
+                     (fn [km]
+                       (into {}
+                             (map (fn [[mod km]]
+                                    (let [em (java.util.EnumMap. Key)]
+                                      (doseq [[k v] km]
+                                        (.put em k v))
+                                      [mod em])))
+                             km)))]
+      bm)))
+
+(defn handle-keyevt [keymap modifiers ^Key k]
+  (when-some [em ^java.util.Map (get keymap modifiers)]
+    (.get em k)))
+
+(defn get-binding* [handlers ^EventKey ek ^Key k]
+  (let [remaps (java.util.ArrayList.)
+        ignore-mask (cond->
+                     (.-_mask KeyModifier/CAPS_LOCK)
+                      (.isArrowKey (.getKey ek))
+                      (bit-or (.-_mask KeyModifier/MAC_FN)))
+        modifiers (bit-and-not (.-_modifiers ek) ignore-mask)]
+    (some (fn [handler]
+            (.add remaps (:effectmap handler))
+            (when-some [effect (handle-keyevt (:keymap handler) modifiers k)]
+              (loop [i (dec (.size remaps))
+                     effect effect]
+                (if (< i 0)
+                  effect
+                  (let [rm (.get remaps i)]
+                    (recur (dec i) (get rm effect effect)))))))
+          handlers)))
+
+(defn get-binding [handlers event]
+  (let [ek ^EventKey (:eventkey event)]
+    (get-binding* handlers ek (.getKey ek))))
+
+(def nav-keybindings
+  [[:modifiers 'control
+    [:keys
+     'F :move-forwards
+     'B :move-backwards
+     'N :move-down
+     'P :move-up
+     'E :move-to-end
+     'A :move-to-start
+     'D :delete-forwards
+     'K :kill
+     'H :delete-backwards
+     'W :delete-backwards-word]]
+   [:modifiers :alt
+    [:keys
+     'right :move-forwards-word
+     'left :move-backwards-word
+     'backspace :delete-backwards-word]]
+   [:keys
+    'right :move-forwards
+    'left :move-backwards
+    'down :move-down
+    'up :move-up
+    'backspace :delete-backwards
+    'delete :delete-forwards]
+   [:modifiers 'shift
+    [:keys
+     'right :move-selection-forwards
+     'left :move-selection-backwards]
+    [:modifiers :alt
+     [:keys
+      'right :move-selection-forwards-word
+      'left :move-selection-backwards-word]]
+    [:modifiers :primary
+     [:keys
+      'right :move-selection-to-end
+      'left :move-selection-to-start]]]
+   [:modifiers :primary
+    [:keys
+     'A :select-all
+     'right :move-to-end
+     'left :move-to-start
+     'backspace :delete-to-start
+     'Z :undo]]])
+
+(def nav-keybindings-handler (make-keybindings-handler nav-keybindings))
+
+(def seg-mode-keybindings
+  [[:keys
+    'ENTER :insert-right
+    'A :insert-right
+    'I :insert-left]
+   [:modifiers :primary
+    [:keys
+     'A :select-all-siblings]]
+   [:remap
+    :move-forwards :next-seg
+    :move-backwards :prev-seg
+    :move-down :down-seg
+    :move-up :up-seg
+    :move-to-end :last-sibling
+    :move-to-start :first-sibling
+    :delete-backwards :delete-seg
+    :delete-forwards :delete-seg]])
+
+(def seg-mode-keybindings-handler (make-keybindings-handler seg-mode-keybindings))
+
+(def insert-mode-keybindings
+  [[:def :seg-mode
+    [:bindings
+     ['escape]
+     ['control 'open-bracket]]]
+   [:remap
+    :move-forwards :next
+    :move-backwards :prev
+    :move-down :down
+    :move-up :up
+    :delete-backwards :delete-prev
+    :delete-forwards :delete-next]])
+
+(def insert-mode-keybindings-handler (make-keybindings-handler insert-mode-keybindings))
+
+(defn remap-default [cursor-pos effect]
+  ({:next-seg [::clj-editor/move-to
+               {:pos :next-seg}]
+    :prev-seg [::clj-editor/move-to
+               {:pos :prev-seg}]
+    :up-seg [::clj-editor/move-to
+             {:pos :up-seg}]
+    :down-seg [::clj-editor/move-to
+               {:pos :down-seg}]
+    :next [::clj-editor/move-to
+           {:pos :next}]
+    :prev [::clj-editor/move-to
+           {:pos :prev}]
+    :up [::clj-editor/move-to
+         {:pos :up-seg}]
+    :down [::clj-editor/move-to
+           {:pos :down-seg}]
+    :seg-mode [::clj-editor/move-to
+               {:pos (dissoc cursor-pos :local-idx)}]
+    :insert-right
+    [::clj-editor/move-to
+     {:pos :insert-right}]
+    :insert-left
+    [::clj-editor/move-to
+     {:pos (clj-editor.nav/assoc-pos-local-idx cursor-pos 0)}]
+    :undo [::clj-editor/undo {}]} effect))
 
 (defn handle-keydown-default [self ctx event]
   (let [state (::clj-editor/state ctx)
-        ek ^EventKey (:eventkey event)
-        k ^Key (.getKey ek)
-        [effect1] (keydown->insert-nav-effect ek k)]
-    (or (when-some [effect (get {::move-forwards [::clj-editor/move-to
-                                               {:pos :next-seg
-                                                :state state}]
-                              ::move-backwards [::clj-editor/move-to
-                                                {:pos :prev-seg
-                                                 :state state}]
-                              ::move-up [::clj-editor/move-to
-                                         {:pos :up-seg
-                                          :state state}]
-                              ::move-down [::clj-editor/move-to
-                                           {:pos :down-seg
-                                            :state state}]}
-                             effect1)]
-          (cui/emit ctx [effect]))
-        (when (key/only-modifier? ek (key/mask KeyModifier/MAC_COMMAND))
-          (cond (identical? Key/Z k)
-                (cui/emit ctx [[::clj-editor/undo {}]]))))))
+        cursor-pos (:cursor state)
+        effect1 (get-binding [(if (:local-idx cursor-pos)
+                                insert-mode-keybindings-handler
+                                seg-mode-keybindings-handler)
+                              nav-keybindings-handler]
+                             event)]
+    (when-some [effect (remap-default cursor-pos effect1)]
+      [(update effect 1 assoc :state state)])))
 
 (def ^java.util.HashMap node-type-keydown-handlers (java.util.HashMap.))
+
+(defn emptyline-handle-keydown [self ctx event]
+  (handle-keydown-default self ctx event))
+
+(defn segment-default-keydown [self ctx event cursor-pos node]
+  (handle-keydown-default self ctx event))
+
+(defn simple-node-remap [state seg cursor-pos cmd]
+  (case cmd
+   :delete-seg
+    [::clj-editor/ast.delete-simple-node
+     {:node-id (ast/line-seg->node-id seg)
+      :pos cursor-pos
+      ::clj-editor/move-to
+      {:state state
+       :pos :prev-seg}}]
+    nil))
+
+(defn keybinding-handlers-default [cursor-pos]
+  [(if (:local-idx cursor-pos)
+     insert-mode-keybindings-handler
+     seg-mode-keybindings-handler)
+   nav-keybindings-handler])
+
+(defn simple-segment-default-keydown [self ctx event cursor-pos node seg]
+  (let [state (::clj-editor/state ctx)
+        effect1 (get-binding (keybinding-handlers-default cursor-pos)
+                             event)]
+    (when-some [effect (or (simple-node-remap state seg cursor-pos effect1)
+                           (remap-default cursor-pos effect1))]
+      [(update effect 1 assoc :state state)])))
 
 (defn handle-keydown [self ctx event]
   (let [state (::clj-editor/state ctx)
         ast (:ast state)
-        cursor (:cursor state)
-        line-id (:line cursor)
+        cursor-pos (:cursor state)
+        line-id (:line cursor-pos)
         line (get (::ast/lines ast) line-id)
-        seg-idx (:seg-idx cursor)]
-    (if-some [seg (when (and (seq line) seg-idx)
-                    (nth line seg-idx))]
-      (let [node-id (ast/line-seg->node-id seg)
-            node (get (::ast/nodes ast) node-id)]
-        (if-some [f (.get node-type-keydown-handlers (::ast/node-type node))]
-          (f self ctx event seg node ast cursor (:local-idx cursor))
-          (handle-keydown-default self ctx event)))
-      ;; Empty line
-      (handle-keydown-default self ctx event))))
+        seg-idx (:seg-idx cursor-pos)
+        effects (if-some [seg (when (and (seq line) seg-idx)
+                                (nth line seg-idx))]
+                  (let [node-id (ast/line-seg->node-id seg)
+                        node (get (::ast/nodes ast) node-id)
+                        seg-type (nth seg 0)]
+                    (if-some [f (.get node-type-keydown-handlers (::ast/node-type node))]
+                      (f self ctx event seg node ast cursor-pos (:local-idx cursor-pos))
+                      (if (= ::ast/seg.simple seg-type)
+                        (simple-segment-default-keydown self ctx event cursor-pos node seg)
+                        (segment-default-keydown self ctx event cursor-pos node))))
+                  (emptyline-handle-keydown self ctx event))]
+    (when effects
+      (cui/emit event effects))))
 
 (defn handle-keyup [self ctx event])
 
 (def ^java.util.HashMap text-handlers-by-type (java.util.HashMap.))
+
+(defn emptyline-handle-text [self ctx text ast cursor-pos]
+  )
 
 (defn handle-text-input [self ctx event]
   (let [state (::clj-editor/state ctx)
@@ -156,198 +317,20 @@
         cursor (:cursor state)
         line-id (:line cursor)
         line (get (::ast/lines ast) line-id)
-        seg-idx (:seg-idx cursor)]
-    (if-some [seg (when (and (seq line) seg-idx)
-                    (nth line seg-idx))]
-      (let [node-id (ast/line-seg->node-id seg)
-            node (get (::ast/nodes ast) node-id)]
-        (if-some [f (.get text-handlers-by-type (::ast/node-type node))]
-          (f self ctx (:hui.event.text-input/text event) seg node ast cursor (:local-idx cursor))
-          #_(handle-keydown-default self ctx event)))
-      ;; Empty line
-      #_(handle-keydown-default self ctx event))))
+        seg-idx (:seg-idx cursor)
+        text (:hui.event.text-input/text event)
+        effects (if-some [seg (when (and (seq line) seg-idx)
+                                (nth line seg-idx))]
+                  (let [node-id (ast/line-seg->node-id seg)
+                        node (get (::ast/nodes ast) node-id)]
+                    (if-some [f (.get text-handlers-by-type (::ast/node-type node))]
+                      (f self ctx text seg node ast cursor)
+                      #_(handle-keydown-default self ctx event)))
+                  (emptyline-handle-text self ctx text ast cursor))]
+    (when effects (cui/emit event effects))))
 
-(defn symbol-valid-as-transient? [symstr]
-  (some? (re-matches #"[!-~\u0080-\uFFFF]+" symstr)))
+(defn install-keydown-handler-for-node-type [typ f]
+  (.put node-type-keydown-handlers typ f))
 
-(defn parse-generous-symbol [symstr]
-  (let [[_ a b] (re-matches #"(?:([^/]*)/)?(.*)" symstr)]
-    (when b (symbol a b))))
-
-(.put node-type-keydown-handlers
-      ::ast/type.symbol
-      (fn keydown [self ctx event seg node ast cursor-pos cursor-idx]
-        (or (let [ek ^EventKey (:eventkey event)
-                  k ^Key (.getKey ek)
-                  state (::clj-editor/state ctx)
-                  [effect1] (keydown->insert-nav-effect ek k)
-                  nstr (ast.string/simple-node->string node)
-                  escape-eft [::clj-editor/move-to
-                              {:pos (dissoc cursor-pos :local-idx)
-                               :state state}]]
-              (if (nil? cursor-idx)
-                (when (key/no-modifiers? ek)
-                  (cond
-                    (or (identical? Key/ENTER k)
-                        (identical? Key/A k))
-                    (cui/emit ctx [[::clj-editor/move-to
-                                    {:pos :insert-right
-                                     :state state}]])
-                    (identical? Key/I k)
-                    (cui/emit ctx [[::clj-editor/move-to
-                                    {:pos :insert-left
-                                     :state state}]])))
-                (if-some [effect (get {::move-forwards
-                                       [::clj-editor/move-to
-                                        {:pos (if (< cursor-idx (count nstr))
-                                                (clj-editor.nav/assoc-pos-local-idx
-                                                 cursor-pos (inc cursor-idx))
-                                                :next-seg)
-                                         :state state}]
-                                       ::move-backwards
-                                       [::clj-editor/move-to
-                                        {:pos (if (< 0 cursor-idx)
-                                                (clj-editor.nav/assoc-pos-local-idx
-                                                 cursor-pos (dec cursor-idx))
-                                                :prev-seg)
-                                         :state state}]
-                                       ::move-up [::clj-editor/move-to
-                                                  {:pos :up-seg
-                                                   :state state}]
-                                       ::move-down [::clj-editor/move-to
-                                                    {:pos :down-seg
-                                                     :state state}]
-                                       ::delete-backwards
-                                       [::clj-editor/delete-region
-                                        {:start-pos :prev
-                                         :end-pos cursor-pos
-                                         :state state}]}
-                                      effect1)]
-                  (cui/emit
-                   ctx
-                   (case (nth effect 0)
-                     ::clj-editor/delete-region
-                     (let [{:keys [state] :as info} (nth effect 1)
-                           ast (:ast state)
-                           cursor (:cursor state)]
-                       (when-some [start-pos (clj-editor.nav/resolve-pos
-                                              self ast cursor (:start-pos info))]
-                         (when-some [end-pos (clj-editor.nav/resolve-pos
-                                              self ast cursor (:end-pos info))]
-                           (when (and (= (:seg-idx start-pos) (:seg-idx end-pos))
-                                      (= (:line start-pos) (:line end-pos)))
-                             (let [start-idx (:local-idx start-pos)
-                                   end-idx (:local-idx end-pos)
-                                   namsp (::ast/symbol.ns node)
-                                   namsp-cnt (count namsp)
-                                   nam (::ast/symbol.name node)
-                                   new-ns? (< start-idx namsp-cnt)
-                                   new-name? (< namsp-cnt end-idx)
-                                   ns2 (if new-ns?
-                                         (str (subs namsp 0 start-idx)
-                                              (subs namsp (min namsp-cnt end-idx)))
-                                         namsp)
-                                   blank-ns? (<= (count ns2) 1)
-                                   ns2 (if blank-ns? nil ns2)
-                                   merge? (and new-ns?
-                                               (or (<= namsp-cnt end-idx) blank-ns?))
-                                   new-name? (or new-name? merge?)
-                                   nam2 (if new-name?
-                                          (let [nam2 (str (subs nam 0 (max 0 (- start-idx namsp-cnt)))
-                                                          (subs nam (max 0 (- end-idx namsp-cnt))))]
-                                            (if merge?
-                                              (str ns2 nam2)
-                                              nam2))
-                                          nam)
-                                   ns2 (when-not (or merge? (== 0 (count ns2)))
-                                         ns2)]
-                               (when (or new-name? new-ns?)
-                                 (if (and (nil? ns2) (== 0 (count nam2)))
-                                  [[::clj-editor/ast.delete-simple-node
-                                    {:node-id (ast/line-seg->node-id seg)
-                                     :pos cursor-pos}]
-                                   [::clj-editor/move-to
-                                    {:pos :prev-seg
-                                     :state state}]]
-                                  (let [symstr (str ns2 nam2)
-                                        transient? (and (nil? (clj-editor.parser/parse-symbol symstr))
-                                                        (symbol-valid-as-transient? symstr))]
-                                    (cond->
-                                     [[::clj-editor/ast.update-node
-                                       {:node-id (ast/line-seg->node-id seg)
-                                        :new-node
-                                        (-> (dissoc node ::ast/transient-node?)
-                                            (cond-> transient?
-                                              (assoc ::ast/transient-node? transient?))
-                                            (cond-> new-ns?
-                                              (assoc ::ast/symbol.ns ns2))
-                                            (cond-> new-name?
-                                              (assoc ::ast/symbol.name nam2)))}]]
-                                     (< start-idx cursor-idx)
-                                     (conj [::clj-editor/move-to
-                                            {:pos (clj-editor.nav/assoc-pos-local-idx
-                                                   cursor-pos (max start-idx (- cursor-idx (- end-idx start-idx))))
-                                             :state state}]))))))))))
-                     [effect]))
-                  (or (when (key/no-modifiers? ek)
-                        (cond (identical? Key/ESCAPE k)
-                              (cui/emit ctx [escape-eft])))
-                      (when (key/only-modifier? ek (key/mask KeyModifier/CONTROL))
-                        (cond
-                          (identical? Key/OPEN_BRACKET k)
-                          (cui/emit ctx [escape-eft])))))))
-            (handle-keydown-default self ctx event))))
-
-(.put text-handlers-by-type
-      ::ast/type.symbol
-      (fn[self ctx text seg node ast cursor-pos cursor-idx]
-        (when-not (nil? cursor-idx)
-          (let [repr (ast.string/simple-node->string node)
-               new-repr (str (subs repr 0 cursor-idx)
-                             text
-                             (subs repr cursor-idx))
-                sym (clj-editor.parser/parse-symbol new-repr)
-                transient? (and (nil? sym)
-                                (symbol-valid-as-transient? new-repr))
-                sym (if transient?
-                      (parse-generous-symbol new-repr)
-                      sym)]
-            (when (or sym transient?)
-             (cui/emit
-              ctx
-              [[::clj-editor/ast.update-node
-                {:node-id (ast/line-seg->node-id seg)
-                 :new-node
-                 (-> (dissoc node ::ast/transient-node?)
-                     (assoc ::ast/transient-node? transient?)
-                     (assoc ::ast/symbol.ns (some-> (namespace sym) (str "/")))
-                     (assoc ::ast/symbol.name (name sym)))}]
-               [::clj-editor/move-to
-                {:pos (clj-editor.nav/assoc-pos-local-idx
-                       cursor-pos (+ cursor-idx (count text)))
-                 :state (::clj-editor/state ctx)}]]))))))
-
-#_(effect-handler
-   ::ast/type.comment
-   (match
-    [::delete-region idx1 idx2]
-
-     [:atom
-      [::uncomment]
-      [::move-to]])
-   (fn text-input [idx text]
-     (or (when (and at-prefix? prefix-before?)
-           [::invalid])
-         [[::ensure-whitespace]
-          effect]))
-   (fn keydown [idx ek]
-     (or
-      (when prefix-before?
-        (cond
-          {::delete-backwards [::uncomment :cursor-to-start]
-           ::delete-to-start nil}))
-      (when at-prefix?
-        (cond
-          {::delete-forwards [::uncomment :cursor-to-start]
-           ::kill [[::copy-text from-cursor-to-end]
-                   [::delete-node nid]]})))))
+(defn install-text-handler-for-node-type [typ f]
+  (.put text-handlers-by-type typ f))

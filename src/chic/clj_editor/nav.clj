@@ -103,7 +103,7 @@
       (enc/merge
        {:line next-line-id
         :vertical-lock-x (:vertical-lock-x ref-pos)}
-       (when-some [next-row-of-segs ^java.util.ArrayList
+       (if-some [next-row-of-segs ^java.util.ArrayList
                    (.get ^java.util.HashMap (:line->segs self) next-line-id)]
          (let [nodes (::ast/nodes ast)
                next-line (get (::ast/lines ast) next-line-id)
@@ -134,7 +134,9 @@
                                              i))
                                          next-line))
                                        0)}))]
-           pos))))))
+           pos)
+         (when (:local-idx ref-pos)
+           {:local-idx 0}))))))
 
 (defn -pos-until-nonws [ast f pos]
   (let [lines (::ast/lines ast)
@@ -174,17 +176,28 @@
     ::ast/seg.comp-end
     (ast.string/composite-node->string-end node)))
 
+(defn assoc-pos-local-idx [pos idx]
+  (assoc (dissoc pos :vertical-lock-x) :local-idx idx))
+
 (defn resolve-pos [self ast ref-pos vpos]
   (let [seg (pos->seg ast ref-pos)
         node (seg->node ast seg)
         vpos (if-some [f (.get position-overrides-by-type (::ast/node-type node))]
                (f vpos ref-pos node)
                vpos)
+        ref-idx (:local-idx ref-pos)
         r (if (map? vpos)
             vpos
             (case vpos
-              :next (assoc ref-pos :local-idx (min (dec (count (seg->string node seg))) (inc (:local-idx ref-pos))))
-              :prev (assoc ref-pos :local-idx (max 0 (dec (:local-idx ref-pos))))
+              :next
+              (let [repr (when node (seg->string node seg))]
+                (if (<= (count repr) ref-idx)
+                  (resolve-pos self ast ref-pos :next-seg)
+                  (assoc-pos-local-idx ref-pos (inc ref-idx))))
+              :prev
+              (if (<= ref-idx 0)
+                (resolve-pos self ast ref-pos :prev-seg)
+                (assoc-pos-local-idx ref-pos (dec ref-idx)))
               :next-seg
               (let [r (-pos-until-nonws ast #(next-seg-pos ast %) ref-pos)]
                 (or (when (:local-idx ref-pos) (resolve-pos self ast r :insert-left)) r))
@@ -197,6 +210,11 @@
               (upordown-seg-pos :up self ast ref-pos)
               :end-insertion
               (prn "lol")
+              :insert-left
+              (assoc-pos-local-idx ref-pos 0)
+              :insert-right
+              (assoc-pos-local-idx
+               ref-pos (count (when node (seg->string node seg))))
               (println "unknown vpos:" vpos)))]
     r))
 
@@ -219,9 +237,6 @@
           (let [diff-top (- (:y view-rect) (:y line-rect))]
             (when (pos? diff-top)
               (hui/-set! ui-vscroll :offset (+ offset diff-top)))))))))
-
-(defn assoc-pos-local-idx [pos idx]
-  (assoc (dissoc pos :vertical-lock-x) :local-idx idx))
 
 (.put position-overrides-by-type
       ::ast/type.symbol

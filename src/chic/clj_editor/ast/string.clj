@@ -42,6 +42,9 @@
      (str "#'"
           (::ast/symbol.ns node)
           (::ast/symbol.name node)))
+   ::ast/type.symbolic-val
+   (fn [node]
+     (str "##" (::ast/symbolic-val.token node)))
    ::ast/type.char
    (fn [node]
      (str "\\" (::ast/char.token node)))})

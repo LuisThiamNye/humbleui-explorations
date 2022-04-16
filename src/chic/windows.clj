@@ -1,5 +1,6 @@
 (ns chic.windows
   (:require
+   [potemkin :refer [doit]]
    [chic.debug :as debug]
    [chic.util :as util]
    [taoensso.encore :as enc]
@@ -85,18 +86,26 @@
 (defn window-app-rect [window-obj]
   (cui/rect-with-wh (huiwin/content-rect window-obj)))
 
-(defn send-event [{:keys [window-obj *ctx *app-root]} event]
+(defn send-event [{:keys [window-obj *ctx *app-root] :as w} event]
   (huip/-event
    @*app-root (enc/merge @*ctx
-                        (assoc event :chic.ui/component-rect
+                         (assoc (assoc event :chic/current-window w) :chic.ui/component-rect
                                (window-app-rect window-obj)))))
+
+(defn schedule-after-event [event callback]
+  (when-some [f (::event.schedule-after event)]
+    (f callback)))
 
 (defn on-event-handler [{:keys [window-obj *ctx] :as win} event]
   (try
     (profile/reset "event")
     (profile/measure
      "event"
-     (let [changed? (condp instance? event
+     (let [post-handlers (java.util.ArrayList. 0)
+           sae (fn [callback] (.add post-handlers callback))
+           send-event (fn [win event]
+                        (send-event win (assoc event ::event.schedule-after sae)))
+           changed? (condp instance? event
                       EventMouseMove
                       (let [pos (IPoint. (.getX ^EventMouseMove event) (.getY ^EventMouseMove event))
                             event {:hui/event :hui/mouse-move
@@ -138,8 +147,10 @@
                       true
 
                       (do #_(println "Other event:" (type event)) nil))]
+       (doit [cb post-handlers]
+         (cb))
        (when changed?
-         (vswap! (:*profiling win) assoc :event-triggers-change-time (System/nanoTime))
+         ;; (vswap! (:*profiling win) assoc :event-triggers-change-time (System/nanoTime))
          (huiwin/request-frame window-obj))))
     (catch Throwable e
       (debug/println-main (pr-str e)))
@@ -251,6 +262,7 @@
 
 (comment
   (remount-window (val (first @*windows)))
+  (request-frame (val (first @*windows)))
   (:window-obj (second (vals @*windows)))
   (:window-obj (first (vals @*windows)))
 (+ 0.5 (- 1 0.5))

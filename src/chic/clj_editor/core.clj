@@ -1,6 +1,7 @@
 (ns chic.clj-editor.core
   (:require
    [clj-commons.primitive-math :as prim]
+   [chic.clj-editor.seg :as clj-editor.seg]
    [chic.clj-editor.event :as clj-editor.event]
    [potemkin :refer [doit]]
    [chic.clj-editor.parser :as parser]
@@ -63,86 +64,91 @@
      (ui/gap 0 0)))))
 
 (defn text-segment []
-  (cui/dynamic
-   ctx [{:keys [fill-text font-code segment cursor-in-seg? seg-cursor-idx]
-         {{nodes ::ast/nodes} :ast}
-         ::clj-editor/state} ctx]
-   (let [seg-label (fn [x]
-                     (cui/lifecycle
-                      (fn after-draw [child ctx]
-                        (when-some [f (::clj-editor.ui/reg-ui-seg! ctx)]
-                          (f child ctx)))
-                      (fn on-close [child unreg]
-                        (when unreg (unreg)))
-                      (cui/measured
-                       (cui/dyncomp (clj-editor.ui/seg-label x font-code)))))
-         ui (case (nth segment 0)
-              ::ast/seg.simple
-              (let [node (get nodes (nth segment 1))]
-                (case (::ast/node-type node)
-                  ::ast/type.symbol
-                  (seg-label
-                   [[(str (::ast/symbol.ns node)) sym-ns-colour]
-                    [(str (::ast/symbol.name node)) fill-text]])
-                  ::ast/type.keyword
-                  (seg-label
-                   [[(ast.string/simple-node->string node) magenta]])
-                  ::ast/type.string
-                  (seg-label
-                   [[(ast.string/simple-node->string node) green]])
-                  ::ast/type.number
-                  (seg-label
-                   [[(ast.string/simple-node->string node) magenta]])
-                  ::ast/type.comment
-                  (seg-label
-                   [[(ast.string/simple-node->string node)
-                     (huipaint/fill 0xFFAA3731)]])
-                  ::ast/type.constant
-                  (seg-label
-                   [[(ast.string/simple-node->string node) magenta]])
-                  ::ast/type.var
-                  (seg-label
-                   [["#'" fill-text]
-                    [(::ast/symbol.ns node) sym-ns-colour]
-                    [(::ast/symbol.name node) fill-text]])
-                  ::ast/type.char
-                  (seg-label
-                   [[(ast.string/simple-node->string node) green]])
-            ;; Else
-                  (seg-label [[(ast.string/simple-node->string node) fill-text]])))
-              ::ast/seg.comp-start
-              (let [node (get nodes (nth segment 1))]
-                (case (::ast/node-type node)
-                  (::ast/type.quote
-                   ::ast/type.syntax-quote
-                   ::ast/type.unquote
-                   ::ast/type.unquote-splicing
-                   ::ast/type.deref
-                   ::ast/type.var)
-                  (seg-label
-                   [[(ast.string/composite-node->string-start node)
-                     (huipaint/fill 0xFF333333)]])
-            ;; Else
-                  (seg-label
-                   [[(ast.string/composite-node->string-start node)
-                     grey]])))
-              ::ast/seg.comp-end
-              (seg-label
-               [[(ast.string/composite-node->string-end
-                  (get nodes (nth segment 1)))
-                 grey]]))]
-     (if (and cursor-in-seg? (nil? seg-cursor-idx))
-       (cuilay/stack
-        (cui/dyncomp (ui-seg-focus-fill))
-        ui)
-       ui))))
+  (cui/updating-ctx
+   (fn [ctx]
+     (assoc ctx :node (get (-> ctx ::clj-editor/state :ast ::ast/nodes)
+                           (nth (:segment ctx) 1))))
+   (cui/dynamic
+    ctx [{:keys [fill-text font-code segment cursor-in-seg? seg-cursor-idx node]} ctx]
+    (let [seg-label (fn [x]
+                      (cui/lifecycle
+                       (fn after-draw [child ctx]
+                         (when-some [f (::clj-editor.ui/reg-ui-seg! ctx)]
+                           (f child ctx)))
+                       (fn on-close [child unreg]
+                         (when unreg (unreg)))
+                       (cui/measured
+                        (cond->> (cui/dyncomp (clj-editor.ui/seg-label x font-code))
+                          (::ast/transient-node? node)
+                          (ui/fill (huipaint/fill (cpaint/okhsva 0.28 0.18 1.0 0.4)))))))
+          ui (case (nth segment 0)
+               ::ast/seg.simple
+               (case (::ast/node-type node)
+                 ::ast/type.symbol
+                 (seg-label
+                  [[(str (::ast/symbol.ns node)) sym-ns-colour]
+                   [(str (::ast/symbol.name node)) fill-text]])
+                 ::ast/type.keyword
+                 (seg-label
+                  [[(ast.string/simple-node->string node) magenta]])
+                 ::ast/type.string
+                 (seg-label
+                  [[(ast.string/simple-node->string node) green]])
+                 ::ast/type.number
+                 (seg-label
+                  [[(ast.string/simple-node->string node) magenta]])
+                 ::ast/type.comment
+                 (seg-label
+                  [[(ast.string/simple-node->string node)
+                    (huipaint/fill 0xFFAA3731)]])
+                 ::ast/type.constant
+                 (seg-label
+                  [[(ast.string/simple-node->string node) magenta]])
+                 ::ast/type.var
+                 (seg-label
+                  [["#'" fill-text]
+                   [(::ast/symbol.ns node) sym-ns-colour]
+                   [(::ast/symbol.name node) fill-text]])
+                 ::ast/type.char
+                 (seg-label
+                  [[(ast.string/simple-node->string node) green]])
+                  ;; Else
+                 (seg-label [[(ast.string/simple-node->string node) fill-text]]))
+               ::ast/seg.comp-start
+               (case (::ast/node-type node)
+                 (::ast/type.quote
+                  ::ast/type.syntax-quote
+                  ::ast/type.unquote
+                  ::ast/type.unquote-splicing
+                  ::ast/type.deref
+                  ::ast/type.var)
+                 (seg-label
+                  [[(ast.string/composite-node->string-start node)
+                    (huipaint/fill 0xFF333333)]])
+                  ;; Else
+                 (seg-label
+                  [[(ast.string/composite-node->string-start node)
+                    grey]]))
+               ::ast/seg.comp-end
+               (seg-label
+                [[(ast.string/composite-node->string-end node)
+                  grey]]))]
+      (if (and cursor-in-seg? (nil? seg-cursor-idx))
+        (cuilay/stack
+         (cui/dyncomp (ui-seg-focus-fill))
+         ui)
+        ui)))))
 
 (defn ui-empty-line []
   (ui/dynamic ctx
-    [{:keys [cursor-in-line?]} ctx]
-    (if cursor-in-line?
+    [{:keys [cursor-in-line? seg-cursor-idx]} ctx]
+    (cond
+      seg-cursor-idx
+      (cui/dyncomp (clj-editor.ui/ui-insert-cursor 2))
+      cursor-in-line?
       (cuilay/width
        6 (cui/dyncomp (ui-seg-focus-fill)))
+      true
       (ui/gap 0 0))))
 
 (defn full-text-line []
@@ -158,7 +164,11 @@
      (cuilay/row
       (ui/gap 0 (Math/ceil (* 1.1 (.getHeight (.getMetrics ^Font font-code)))))
       (if (== 0 (count line-nodes))
-        (cui/dyncomp (ui-empty-line))
+        (cui/updating-ctx
+         (fn [ctx]
+           (-> ctx
+               (assoc :seg-cursor-idx (:local-idx (:line-cursor ctx)))))
+         (cui/dyncomp (ui-empty-line)))
         (eduction
          (map-indexed
           (fn [idx segment]
@@ -310,7 +320,29 @@
                        (java.util.HashMap.)
                        (cui/dyncomp (main-view))))
         self (:child ui-editor-dc)
-        focus-node (random-uuid)]
+        focus-node (random-uuid)
+        move-to-handler
+        (fn [info]
+          (let [state (:state info)]
+            (when-some [pos (clj-editor.nav/resolve-pos
+                             self (:ast state) (:cursor state) (:pos info))]
+              (swap! *state assoc :cursor pos)
+              (clj-editor.nav/ensure-cursor-in-view self (:ast state) pos))
+            nil))
+        delete-simple-node
+        (fn [node-id pos]
+          (swap! *state update :ast
+                 (fn [ast]
+                   (-> ast (update ::ast/nodes dissoc node-id)
+                       (update-in [::ast/lines (:line pos)]
+                                  (fn [segs]
+                                    (into (subvec segs 0 (:seg-idx pos))
+                                          (subvec segs (inc (:seg-idx pos))))))))))
+        replace-simple-node
+        (fn [node-id node]
+          (swap! *state update :ast
+                 (fn [ast]
+                   (-> ast (update ::ast/nodes assoc node-id node)))))]
     (cui/updating-ctx
      (fn [ctx]
        (assoc ctx ::clj-editor/state @*state))
@@ -327,36 +359,32 @@
             (reset! *state (nth states idx)))))
       (cui/on
        ::clj-editor/ast.delete-simple-node
-       (fn [{:keys [pos node-id]}]
+       (fn [{:keys [pos node-id ::clj-editor/move-to]}]
          (backup-state! *state)
-         (swap! *state update :ast
-                (fn [ast]
-                  (-> ast (update ::ast/nodes dissoc node-id)
-                      (update-in [::ast/lines (:line pos)]
-                                 (fn [segs]
-                                   (into (subvec segs 0 (:seg-idx pos))
-                                         (subvec segs (inc (:seg-idx pos))))))))))
+         (when move-to (move-to-handler move-to))
+         (delete-simple-node node-id pos))
        (cui/on
-        ::clj-editor/ast.update-node
-        (fn [{:keys [node-id new-node]}]
+        ::clj-editor/ast.replace-simple-node
+        (fn [{:keys [pos node-id new-node ::clj-editor/move-to]}]
           (backup-state! *state)
-          (swap! *state assoc-in [:ast ::ast/nodes node-id] new-node))
+          (when move-to (move-to-handler move-to))
+          (replace-simple-node node-id new-node))
         (cui/on
-         ::clj-editor/move-to
-         (fn [info]
-           (let [state (:state info)]
-             (when-some [pos (clj-editor.nav/resolve-pos
-                              self (:ast state) (:cursor state) (:pos info))]
-               (swap! *state assoc :cursor pos)
-               (clj-editor.nav/ensure-cursor-in-view self (:ast state) pos))
-             nil))
-         (cui/on-event
-          (fn [event]
-            (when (= :hui/text-input (:hui/event event))
-              (keybindings/handle-text-input self (:ctx event) event)))
-          (focusable/make
-           {:focus-node focus-node}
-           ui-editor-dc)))))))))
+         ::clj-editor/ast.update-node
+         (fn [{:keys [node-id new-node ::clj-editor/move-to]}]
+           (backup-state! *state)
+           (when move-to (move-to-handler move-to))
+           (swap! *state assoc-in [:ast ::ast/nodes node-id] new-node))
+         (cui/on
+          ::clj-editor/move-to
+          move-to-handler
+          (cui/on-event
+           (fn [event]
+             (when (= :hui/text-input (:hui/event event))
+               (keybindings/handle-text-input self (:ctx event) event)))
+           (focusable/make
+            {:focus-node focus-node}
+            ui-editor-dc))))))))))
 
 (comment
   (let [s (slurp "src/chic/graph.clj")

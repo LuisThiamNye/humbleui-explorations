@@ -1,5 +1,6 @@
 (ns chic.clj-editor.parser.test
   (:require
+   [tech.droit.fset :as fset]
    [malli.core :as m]
    [chic.clj-editor.lines :as lines]
    [criterium.core :as crit]
@@ -8,6 +9,66 @@
    [chic.clj-editor.parser :as parser]))
 
 (def node-id-schema [:or keyword? integer?])
+
+(def comp-node-types-with-end
+  #{::ast/type.vector
+    ::ast/type.list
+    ::ast/type.set
+    ::ast/type.map
+    ::ast/type.fn})
+
+(def comp-node-wrapper-types
+  "Prefix + Whitespace* + child"
+  #{::ast/type.quote
+    ::ast/type.syntax-quote
+    ::ast/type.unquote
+    ::ast/type.unquote-splicing
+    ::ast/type.conditional
+    ::ast/type.splicing-conditional
+    ::ast/type.deref
+    ::ast/type.discard
+    ::ast/type.eval
+
+    ;; complex prefixes
+    ::ast/type.ns-map
+    ::ast/type.tagged})
+
+(def comp-node-types
+  (fset/union
+   #{::ast/type.meta
+     }
+   comp-node-types-with-end
+   comp-node-wrapper-types))
+
+(def simple-node-types
+  #{::ast/type.constant
+    ::ast/type.symbol
+    ::ast/type.arg
+    ::ast/type.keyword
+    ::ast/type.var
+
+    ::ast/type.number
+
+    ::ast/type.symbolic-val
+    ::ast/type.char
+
+    ;; multiline
+    ::ast/type.regex
+    ::ast/type.string
+
+    ;; whitespace
+    ::ast/type.whitespace
+    ::ast/type.commas
+    ::ast/type.comment ;; to end of line
+    })
+
+(def segment-schema
+  [:tuple
+   [:enum
+    ::ast/seg.comp-end
+    ::ast/seg.comp-start
+    ::ast/seg.simple]
+   node-id-schema])
 
 (def tdb-schema
   [:map
@@ -20,12 +81,10 @@
        [:vector node-id-schema]]]]]
    [::ast/lines
     [:map-of integer?
-     [:vector vector?]]]
+     [:vector
+      segment-schema]]]
    [::ast/line-order
     [:vector integer?]]])
-::ast/seg.comp-end
-::ast/seg.comp-start
-::ast/seg.simple
 
 (defn- read-str [s]
   (parser/read-fresh (java.io.StringReader. s)))
@@ -38,10 +97,10 @@
                    (catch Throwable e
                      e))]
         (recur
-        (conj results
-              [s r (when-not (instance? Throwable r)
-                     (m/explain @#'tdb-schema r))])
-        (next strs)))
+         (conj results
+               [s r (when-not (instance? Throwable r)
+                      (m/explain @#'tdb-schema r))])
+         (next strs)))
       results)))
 
 (def sample-strs

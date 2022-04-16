@@ -103,7 +103,7 @@
             (ui/gap 0 0)]
            (cui/clickable
             (uievt/on-primary-down
-             (fn [_] (cui/refresh-all-dyncomps!)))
+             (fn [_evt] (cui/refresh-all-dyncomps!)))
             (ui/fill (huipaint/fill 0x11000000)
                      (cuilay/valign
                       0.5 (cuilay/padding 20 0 (ui/label "Refresh" font-ui fill-text)))))

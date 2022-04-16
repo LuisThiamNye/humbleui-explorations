@@ -362,11 +362,18 @@
 
 (def *dyncomps-by-var (atom {}))
 
-(deftype+ Dyncomp [thevar ^:mut active-var-value ctor ^:mut child]
+(deftype+ Dyncomp [thevar ^:mut active-var-value ctor ^:mut outdated? ^:mut child]
   IComponent
-  (-measure [_ ctx cs] (huip/-measure child ctx cs))
+  (-measure [_ ctx cs]
+    (when outdated?
+      (set! child (ctor))
+      (set! outdated? false))
+    (huip/-measure child ctx cs))
 
   (-draw [_ ctx cs ^Canvas canvas]
+    (when outdated?
+      (set! child (ctor))
+      (set! outdated? false))
     (huip/-draw child ctx cs canvas))
 
   (-event [_ event] (huip/-event child event))
@@ -382,10 +389,10 @@
       (let [v2 @(:thevar c)]
         (when-not (= v2 (:active-var-value c))
           (hui/-set! c :active-var-value v2)
-          (hui/-set! c :child ((:ctor c))))))))
+          (hui/-set! c :outdated? true))))))
 
 (defn dyncomp* [avar ctor]
-  (let [c (->Dyncomp avar @avar ctor (ctor))]
+  (let [c (->Dyncomp avar @avar ctor false (ctor))]
     (swap! *dyncomps-by-var update avar (fnil conj #{}) c)
     c))
 
@@ -541,13 +548,11 @@
     (huip/-draw child ctx cs canvas))
 
   (-event [_ event]
-    (let [handler' (if-let [f (::effect-handler (:ctx event))]
+    (let [handler' (if-let [f (::effect-handler event)]
                      (comp f handler)
                      handler)]
       (huip/-event
-       child (assoc event
-                    ::effect-handler handler'
-                    :ctx (assoc (:ctx event) ::effect-handler handler')))))
+       child (assoc event ::effect-handler handler'))))
 
   AutoCloseable
   (close [_] (ui/child-close child)))

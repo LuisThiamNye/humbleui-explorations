@@ -1,5 +1,7 @@
 (ns chic.clj-editor.ui
   (:require
+   [chic.ui.event :as uievt]
+   [chic.clj-editor.nav :as clj-editor.nav]
    [potemkin :refer [doit]]
    [clj-commons.primitive-math :as prim]
    [chic.clj-editor.parser :as parser]
@@ -51,6 +53,12 @@
 
 (def ^Paint cursor-blue (huipaint/fill 0xE0007ACC))
 
+(defn ui-insert-cursor [cursor-width]
+  (cui/responder
+   {::get-cursor-rect
+    (fn [child _] (:rect child))}
+   (cui/measured (ui/fill cursor-blue (ui/gap cursor-width 0)))))
+
 (defn seg-label [strs+paints ^Font font]
   (let [n (count strs+paints)
         paints (java.util.ArrayList. n)
@@ -61,27 +69,40 @@
       (.add lines (.shapeLine cui/shaper s font ShapingOptions/DEFAULT)))
     (cui/dynamic ctx
       [{:keys [seg-cursor-idx]} ctx]
-      (let [ui (cui/responder
-                {::cursor-rect->idx
-                 (fn [child {:keys [rect]}]
-                   (let [xstart (:x (:rect child))
-                         x (:x rect)
-                         cdx (- x xstart)]
-                     (loop [i 0
-                            dx 0
-                            idx 0]
-                       (if (< i (.size lines))
-                         (let [line ^TextLine (.get lines i)
-                               s (nth (nth strs+paints i) 0)
-                               dx' (+ dx (.getWidth line))]
-                           (if (< dx' cdx)
-                             (recur (inc i) dx' (+ idx (count s)))
-                             (+ idx (.getOffsetAtCoord line (- cdx dx)))))
-                         idx))))}
-                (cui/measured
-                 (cuilay/valign
-                  0.3 (cui/dyncomp
-                       (->SegLabel lines paints font (.getMetrics font))))))]
+      (let [x->idx (fn [child x]
+                     (let [xstart (:x (:rect child))
+                           cdx (- x xstart)]
+                       (loop [i 0
+                              dx 0
+                              idx 0]
+                         (if (< i (.size lines))
+                           (let [line ^TextLine (.get lines i)
+                                 s (nth (nth strs+paints i) 0)
+                                 dx' (+ dx (.getWidth line))]
+                             (if (< dx' cdx)
+                               (recur (inc i) dx' (+ idx (count s)))
+                               (+ idx (.getOffsetAtCoord line (- cdx dx)))))
+                           idx))))
+            span (cui/measured
+                  (cuilay/valign
+                   0.3 (cui/dyncomp
+                        (->SegLabel lines paints font (.getMetrics font)))))
+            ui (cui/clickable
+                (uievt/on-primary-down
+                 (fn [evt]
+                   (let [ctx(:ctx evt)
+                         state (::clj-editor/state ctx)]
+                     (cui/emit evt
+                               [[::clj-editor/move-to
+                                 {:pos {:line (:line-id ctx)
+                                        :seg-idx (:seg-idx ctx)
+                                        :local-idx (x->idx span (:x (:chic.ui/mouse-win-pos evt)))}
+                                  :state state}]]))))
+                (cui/responder
+                 {::cursor-rect->idx
+                  (fn [child {:keys [rect]}]
+                    (x->idx child (:x rect)))}
+                 span))]
         (if seg-cursor-idx
           (let [loffset (loop [idx seg-cursor-idx
                                i 0
@@ -99,10 +120,7 @@
              (cuilay/halign
               0 (cuilay/translate
                  loffset 0
-                 (cui/responder
-                  {::get-cursor-rect
-                   (fn [child _] (:rect child))}
-                  (cui/measured (ui/fill cursor-blue (ui/gap cursor-width 0))))))))
+                 (cui/dyncomp (ui-insert-cursor cursor-width))))))
           ui)))))
 
 (deftype+ VirtualVScroll [seg-ids ctor ^:mut child child-after ^:mut offset ^:mut size ^:mut child-rect]

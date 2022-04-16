@@ -36,7 +36,7 @@
                       {::ast/comment.contents (.toString sb)
                        ::ast/comment.prefix ";"})))
 
-(defn read-children-until-nonws! [parser parent ^CharReader rdr]
+(defn read-children-upto-nonws! [parser parent ^CharReader rdr]
   (loop []
     (let [child-id (pshared/read-node parser parent rdr)
           child (pshared/get-node parser child-id)]
@@ -49,7 +49,7 @@
   ([parser parent ^CharReader rdr typ m]
    (let [wrapper-id (pshared/append-transient-node-with-children!
                      parser parent typ m)]
-     (read-children-until-nonws! parser wrapper-id rdr)
+     (read-children-upto-nonws! parser wrapper-id rdr)
      (pshared/persist-node! parser wrapper-id)
      wrapper-id)))
 
@@ -62,8 +62,8 @@
 (defn read-meta! [parser parent ^CharReader rdr _caret]
   (let [wrapper-id (pshared/append-transient-node-with-children!
                     parser parent ::ast/type.meta (b/hmap {}))]
-    (read-children-until-nonws! parser wrapper-id rdr)
-    (read-children-until-nonws! parser wrapper-id rdr)
+    (read-children-upto-nonws! parser wrapper-id rdr)
+    (read-children-upto-nonws! parser wrapper-id rdr)
     (pshared/persist-node! parser wrapper-id)
     wrapper-id))
 
@@ -107,7 +107,7 @@
 
 (defn read-char! [parser parent ^CharReader rdr _backslash]
   (let [token (pshared/read-token* parser rdr (read-char rdr))]
-    (append-new-node! parser parent ::ast/type.char {::ast/char.token token})))
+    (append-new-node! parser parent ::ast/type.char (ast/char-node token))))
 
 (defn read-arg! [parser parent ^CharReader rdr _percent]
   (let [c (read-char rdr)
@@ -115,7 +115,7 @@
                   (pshared/terminating-macro? parser (int c)))
             (do (.unread rdr) nil)
             c)]
-    (append-new-node! parser parent ::ast/type.arg (if n {::ast/arg.n n} {}))))
+    (append-new-node! parser parent ::ast/type.arg (ast/arg-node n))))
 
 (defn read-ctor! [parser parent ^CharReader rdr initch]
   (let [tag (pshared/read-token* parser rdr initch)
@@ -124,7 +124,7 @@
                  parser parent ::ast/type.tagged
                  (b/hmap {::ast/tagged.tag-ns tag-ns
                           ::ast/tagged.tag-name tag-name}))]
-    (read-children-until-nonws! parser ctor-id rdr)
+    (read-children-upto-nonws! parser ctor-id rdr)
     (pshared/persist-node! parser ctor-id)
     ctor-id))
 
@@ -137,14 +137,13 @@
 (defn read-symbolic-val! [parser parent ^CharReader rdr _hash]
   (let [token (pshared/read-token* parser rdr (read-char rdr))]
     (append-new-node! parser parent ::ast/type.symbolic-val
-                      {::ast/symbolic-val.token token})))
+                      (ast/symbolic-val-node token))))
 
 (defn read-var! [parser parent ^CharReader rdr _quote]
   (let [token (pshared/read-token* parser rdr (read-char rdr))
         [_ namsp nam] (re-matches #"(?:(.*/))?(.+)" token)]
     (append-new-node! parser parent ::ast/type.var
-                      {::ast/symbol.ns namsp
-                       ::ast/symbol.name nam})))
+                      (ast/var-node namsp nam))))
 
 (defn read-regex! [parser parent ^CharReader rdr _doublequote]
   (let [sb (StringBuilder.)]
