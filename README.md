@@ -20,13 +20,12 @@ Contents:
 - Basic vim-like editor -- to be done better
 - Clojure var browser (editor is broken)
 - Basic file browser with delete function
-- Partially implemented structural Clojure editor
+- Partially implemented structural Clojure editor (a bit broken on high-DPI displays)
 - Glamorous Toolkit -like inspector (digger) -- use `tap>`
 - Quantum circuit simulation that I used in an internship application
 - Some partially implemented stuff for catching errors (see statusbar) and suspending/restarting threads
 
 # License
 
-Distributed under Eclipse Public License 2.0 (see `LICENSE-EPL`)
-except for files that state they are licensed under Apache License 2.0 (see `LICENSE-APACHE-2`)
-in a header.
+Unless otherwise stated in a header, each file is distributed under Eclipse Public License 2.0 (see `LICENSE-EPL`).
+The license described by `LICENSE-APACHE-2` applies to files that state they are licensed under Apache License 2.0.
