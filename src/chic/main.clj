@@ -155,7 +155,7 @@
        :*app-root *app-root
        :build-app-root #(cui/dyncomp (build-app-root))
        :on-close #(fn [])})
-      (huiwin/set-title "Chic")
+      (huiwin/set-title "Main")
       (huiwin/set-window-size width height)
       (huiwin/set-window-position x y)
       (huiwin/set-visible true))))
@@ -183,7 +183,7 @@
    (Runtime/getRuntime)
    (Thread. (fn [] (fs/delete-if-exists ".nrepl-port"))))
   ;; (debug/attach-vm!)
-  ;; (debugger/install-debug-ctx!)
+  (debugger/install-debug-ctx!)
   (let [class-loader
         (.getClassLoader (Class/forName "clojure.lang.Compiler"))
         #_(.getContextClassLoader

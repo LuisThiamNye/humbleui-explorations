@@ -1,5 +1,6 @@
 (ns chic.clj-editor.parser
   (:require
+   [chic.util :as util]
    [chic.clj-editor.parser.shared :as pshared
     :refer [append-new-node! read-char safe-unread]]
    [chic.clj-editor.parser.macros :as rmacros]
@@ -247,7 +248,7 @@
     (while (not (or (.eof rdr) (== -1 (.read rdr))))
       (.unread rdr)
       (read* parser parent-id rdr))
-    (pshared/persist-node! parser parent)
+    (pshared/persist-node! parser parent-id)
     (pshared/persistent-result! parser)))
 
 (defn read-fresh [^Reader rdr]

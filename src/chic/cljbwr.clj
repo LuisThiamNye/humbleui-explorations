@@ -2,6 +2,7 @@
   (:require
    [chic.clj.source :as clj.source]
    [io.github.humbleui.paint :as huipaint]
+   [chic.ui.error :as ui.error]
    [chic.ui :as cui]
    [chic.ui.event :as uievt]
    [chic.text-editor :as text-editor]
@@ -131,7 +132,8 @@
       (cuilay/padding
        5 5
        (if-let [ext-src (and #_jar? (clj.source/crude-source-of-var member))]
-         (text-editor/element (text-editor.core/make {:content ext-src :pos 0}))
+         (ui.error/bound-errors
+          (text-editor/element (text-editor.core/make {:content ext-src :pos 0})))
          (ui/label "No source available" font-ui fill-text)))
       (ui/gap 0 0)))))
 

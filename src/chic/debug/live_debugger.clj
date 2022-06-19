@@ -30,7 +30,7 @@
 
 (defn source-view [^com.sun.jdi.StackFrame frame]
   (let [^com.sun.jdi.Location location (.location frame)]
-    (ui/dynamic
+    (cui/dynamic
      ctx [{:keys [font-ui font-code fill-text]} ctx]
      (cuilay/column
       (ui/fill (huipaint/fill 0x40000000) (ui/gap 0 1))
@@ -81,7 +81,7 @@
 
 (defn make [info]
   (let [thread-ref ^com.sun.jdi.ThreadReference (:thread-ref info)]
-    (ui/dynamic
+    (cui/dynamic
      ctx [{:keys [font-ui font-code fill-text]} ctx]
      (cuilay/column
       (for [^com.sun.jdi.StackFrame frame (.frames thread-ref)]

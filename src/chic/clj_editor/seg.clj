@@ -77,7 +77,7 @@
             {:pos :prev-seg
              :state state}}]
           (let [symstr (str ns2 nam2)
-                good-sym (clj-editor.parser/parse-symbol symstr)
+                good-sym (parser/parse-symbol symstr)
                 transient? (and (nil? good-sym)
                                 (symbol-valid-as-transient? symstr))
                 sym (or good-sym (parse-generous-symbol symstr))
@@ -209,7 +209,7 @@
       nil)))
 
 (defn symbol-handle-changed-text [state seg node cursor-pos old-repr new-repr idx2]
-  (let [sym (clj-editor.parser/parse-symbol new-repr)
+  (let [sym (parser/parse-symbol new-repr)
         tsym (and (nil? sym) (parse-generous-symbol new-repr))
         move-to-info (when idx2 (move-to-info-local-idx state cursor-pos idx2))
         update-node
@@ -262,7 +262,7 @@
     (if (re-find #"^:" new-repr)
       (let [auto? (re-find #"^::" new-repr)
             rawsym (subs new-repr (if auto? 2 1))
-            sym (clj-editor.parser/parse-symbol rawsym)
+            sym (parser/parse-symbol rawsym)
             tsym (and (nil? sym) (parse-transient-keyword-symbol rawsym))
             update-node
             #(-> node

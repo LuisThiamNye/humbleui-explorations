@@ -34,7 +34,6 @@
 (def ^:private *error-id-counter (atom Long/MIN_VALUE))
 
 (defn new-error-id [] (swap! *error-id-counter inc))
-(.hashCode(Exception.))
 
 (def *state (atom {:selected-error-idx nil
                    :error-stack []}))
@@ -183,20 +182,19 @@
              (if (and (nil? selected-error-idx) (pos? (count error-stack)))
                (assoc sm :selected-error-idx (dec (count error-stack)))
                sm))))
-  (ui/dynamic
-   ctx [{:keys [font-ui fill-text scale]} ctx]
-   (ui/with-context
-     {}
-     (cuilay/column
-      (cui/dyncomp (control-bar))
-      [:stretch 1
-       (cui.error/bound-errors
-        (ui/dynamic
+  (cui/dynamic
+   ctx [{:keys [font-ui fill-text]} ctx]
+    (cuilay/column
+     (cui/dyncomp (control-bar))
+     [:stretch 1
+      (cui.error/bound-errors
+       (cui/dynamic
          _ [{:keys [selected-error-idx error-stack]} @*state]
          (if-let [selected-error (and selected-error-idx (nth error-stack selected-error-idx nil))]
            (let [session (or (:digger-session selected-error)
-                             (let [session (digger/new-session (assoc (:thread-snapshot selected-error)
-                                                                      :throwable (:throwable selected-error)))]
+                             (let [session (digger/new-session
+                                            (assoc (:thread-snapshot selected-error)
+                                                   :throwable (:throwable selected-error)))]
                                (swap! *state assoc-in [:error-stack selected-error-idx :digger-session]
                                       session)
                                session))]
@@ -206,7 +204,7 @@
                                 " on thread: " (some-> ^Thread (:thread selected-error) .getName)) font-ui fill-text))
               [:stretch 1 (cui/dyncomp #_(live-debugger/make selected-error)
                                        (digger/make session))]))
-           (ui/gap 0 0))))]))))
+           (ui/gap 0 0))))])))
 
 (def *main-error-window-root (volatile! nil))
 

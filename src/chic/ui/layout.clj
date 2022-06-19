@@ -1,3 +1,7 @@
+;; Licensed under Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+;; Adapted from https://github.com/HumbleUI/HumbleUI/blob/HEAD/src/io/github/humbleui/ui.clj
+;; (commit 4deed5195a61511c348c0799db118c5c25d73c04)
+
 (ns chic.ui.layout
   (:require
    [taoensso.encore :as enc]

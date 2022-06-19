@@ -65,12 +65,15 @@
   (install-instrumented-let!))
 
 (comment
-  (find-recur '(recur))
-  (partition 2)
+
+
+
+
+
   (def t (Thread.
           (fn []
             (catching-all
-             (+ "")))))
+             (+ "OH NO")))))
   (.start t)
 
   (catching-all
@@ -88,5 +91,6 @@
     (/ 0)
     5)
   (macroexpand-1 '(chic.humbleui/deftype+ x [y] X (doit [_] (set! y 0))))
+  (tap> 4)
   #!
   )

@@ -118,7 +118,7 @@
         (if-let [frame (first frames)]
           (let [clsname (:class-name frame)]
             (cond
-              (some #(= % "clojure.lang.Fn") (map #(.getName ^Class %) (ancestors (Class/forName clsname))))
+              (some #(= % "clojure.lang.Fn") (map #(.getName ^Class %) (supers (Class/forName clsname))))
               (cond
                 (and (= "invokeStatic" (:method-name frame))
                      (= "invoke" (:method-name (second frames))))
@@ -153,16 +153,16 @@
                                   ui (source-view (source-of-sym sym) highlighted-line))
                                  ui))
                          (next frames))))
-              (some #(= % "clojure.lang.IType") (map #(.getName ^Class %) (ancestors (Class/forName clsname))))
+              (some #(= % "clojure.lang.IType") (map #(.getName ^Class %) (supers (Class/forName clsname))))
               (recur (conj children
                            (cuilay/row
                             (file-label (:file-name frame))
                             (line-number-seg (:line-number frame))
                             (cuilay/padding
-                             0 2 (ns-label clsname))
+                             0 2 (ui/label (str (repl/demunge (:method-name frame)) " ")
+                                           font-ui fill-text))
                             (cuilay/padding
-                             0 2 (ui/label (str " " (repl/demunge (:method-name frame)))
-                                           font-ui fill-text))))
+                             0 2 (ns-label clsname))))
                      (next frames))
               :else
               (recur (conj children

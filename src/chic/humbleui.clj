@@ -1,10 +1,13 @@
+;; Licensed under Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+;; Adapted from https://github.com/HumbleUI/HumbleUI/blob/HEAD/src/io/github/humbleui/core.clj
+;; (commit 4deed5195a61511c348c0799db118c5c25d73c04)
+;; Changes:
+;; - allow more type hints in the fields
+
 (ns chic.humbleui
   (:require
    [io.github.humbleui.core :as hui]
    [clojure.set :as set]))
-
-;; Adapted from https://github.com/HumbleUI/HumbleUI/blob/HEAD/src/io/github/humbleui/core.clj
-;; To allow more type hints in the fields
 
 (defmacro deftype+
   "Same as deftype, but:

@@ -39,7 +39,7 @@
                 (java.io.InputStreamReader.
                  (.openStream
                   (java.net.URL.
-                   "https://raw.githubusercontent.com/google/material-design-icons/master/update/current_versions.json"))))))))
+                   "https://raw.githubusercontent.com/google/material-design-icons/4.0.0/update/current_versions.json"))))))))
 
 (def *svg-bytes-cache (atom {}))
 
@@ -47,14 +47,14 @@
   (enc/memoize
    (fn [title style size]
      (util/url->bytes
-      (str "https://raw.githubusercontent.com/google/material-design-icons/master/src/"
+      (str "https://raw.githubusercontent.com/google/material-design-icons/4.0.0/src/"
            (icon-name->category title)
            "/" title
            "/materialicons" (if (= "filled" style) "" style)
            "/" size ".svg")))))
 
 (defn svg-data [title style size]
-  #_(str "https://github.com/google/material-design-icons/tree/master/font/MaterialIcons"
+  #_(str "https://github.com/google/material-design-icons/tree/4.0.0/font/MaterialIcons"
        (case style
          "filled" ""
          "round" "Round"
@@ -66,6 +66,7 @@
 
 (comment
   (svg-data "folder" "outlined" "24px")
+  (icon-name->category "add")
 
   #!
   )

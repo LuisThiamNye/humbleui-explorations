@@ -115,11 +115,7 @@
   (/ 0)
 
   (def --x nil)
-  (let [x 4]
-    (tap>
-     (into []
-           (comp (remove string?))
-           (get-stack-variables))))
+
 
   (Thread/setDefaultUncaughtExceptionHandler
    (reify Thread$UncaughtExceptionHandler

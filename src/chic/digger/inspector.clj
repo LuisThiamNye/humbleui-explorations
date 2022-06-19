@@ -229,7 +229,7 @@
 
 (defn inspector [obj]
   (cui.error/bound-errors
-   (ui/dynamic
+   (cui/dynamic
     ctx [{:keys [fill-text font-ui]} ctx
          _ @#'get-inspector-views]
     (cuilay/column
@@ -256,7 +256,7 @@
                                    :id :metadata
                                    :ui-fn #(inspector (meta %))}))
               *state (atom {:selected-view (:id (first views))})]
-          (ui/dynamic
+          (cui/dynamic
            _ [{:keys [selected-view]} @*state]
            (cuilay/column
             (cuilay/hscroll

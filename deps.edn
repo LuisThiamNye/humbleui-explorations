@@ -26,6 +26,7 @@
         org.clj-commons/primitive-math {:mvn/version "1.0.0"}
         metosin/malli {:mvn/version "0.8.4"}
         riddley/riddley {:mvn/version "0.2.0"}
+        net.mikera/core.matrix {:mvn/version "0.62.0"}
         org.clojure/core.match {:mvn/version "1.0.0"}
         com.crypticbutter/snoop {:mvn/version "21-353-alpha"}
         tech.droit/fset {:mvn/version "0.1.1"}

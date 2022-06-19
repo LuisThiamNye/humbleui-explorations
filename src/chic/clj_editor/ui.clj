@@ -1,18 +1,10 @@
 (ns chic.clj-editor.ui
   (:require
    [chic.ui.event :as uievt]
-   [chic.clj-editor.nav :as clj-editor.nav]
    [potemkin :refer [doit]]
    [clj-commons.primitive-math :as prim]
-   [chic.clj-editor.parser :as parser]
    [chic.util :as util]
    [chic.clj-editor :as clj-editor]
-   [chic.clj-editor.ast.string :as ast.string]
-   [chic.clj-editor.ast :as ast]
-   [chic.clj-editor.lines :as lines]
-   [rewrite-clj.parser :as rw.p]
-   [rewrite-clj.node :as rw.n]
-   [rewrite-clj.zip :as rw.z]
    [io.github.humbleui.profile :as profile]
    [chic.focus :as focus]
    [io.github.humbleui.paint :as huipaint]
@@ -90,14 +82,15 @@
             ui (cui/clickable
                 (uievt/on-primary-down
                  (fn [evt]
-                   (let [ctx(:ctx evt)
+                   (let [ctx (:ctx evt)
                          state (::clj-editor/state ctx)]
-                     (cui/emit evt
-                               [[::clj-editor/move-to
-                                 {:pos {:line (:line-id ctx)
-                                        :seg-idx (:seg-idx ctx)
-                                        :local-idx (x->idx span (:x (:chic.ui/mouse-win-pos evt)))}
-                                  :state state}]]))))
+                     (cui/emit
+                      evt [[::clj-editor/move-to
+                            {:pos {:line (:line-id ctx)
+                                   :seg-idx (:seg-idx ctx)
+                                   :local-idx
+                                   (x->idx span (:x (:chic.ui/mouse-win-pos evt)))}
+                             :state state}]]))))
                 (cui/responder
                  {::cursor-rect->idx
                   (fn [child {:keys [rect]}]

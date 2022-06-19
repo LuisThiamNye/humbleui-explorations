@@ -1,6 +1,7 @@
 (ns chic.demo
   (:require
    [chic.ui.event :as uievt]
+   [chic.quantum.demo :as quantum.demo]
    [chic.digger :as digger]
    [chic.cljbwr :as cljbwr]
    [chic.depview :as depview]
@@ -78,7 +79,7 @@
      (ui/fill
       (huipaint/fill 0xFFb0b0b0)
       (cuilay/row
-       (for [tab [:home :namespaces :browser :cljbrowser :digger]]
+       (for [tab [:home :namespaces :browser :cljbrowser :quantum :digger]]
          [:stretch 1
           (cui/clickable
            (uievt/on-primary-down (fn [_] (swap! *state assoc :selected-tab tab)))
@@ -142,4 +143,5 @@
         :browser (cui/dyncomp (filebwr/basic-view))
         :cljbrowser (cui/dyncomp (cljbwr/basic-view))
         :namespaces (cui/dyncomp (depview/basic-view))
+        :quantum (cui/dyncomp (quantum.demo/basic-view))
         :digger (cui/dyncomp (digger/basic-view)))])))
